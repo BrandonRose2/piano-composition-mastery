@@ -5,13 +5,15 @@
  * Accent: Antique Gold oklch(0.78 0.12 85)
  */
 
-import { useState, useEffect, useRef } from "react";
-import { ChevronDown, ChevronUp, Music, BookOpen, Dumbbell, Calendar, Info } from "lucide-react";
+import { useState, useEffect, useRef, useCallback } from "react";
+import { ChevronDown, ChevronUp, Music, BookOpen, Dumbbell, Calendar, Info, CheckCircle2, Circle, RotateCcw } from "lucide-react";
 
 // ── Asset URLs ──────────────────────────────────────────────────────────────
 const HERO_BG = "https://d2xsxph8kpxj0f.cloudfront.net/310519663449376037/iyZgf5CgymBq6EtTfh66yp/hero_bg-DDCWpXMzKGFmMUM3oU8SpS.webp";
 const LISZT_PORTRAIT = "https://d2xsxph8kpxj0f.cloudfront.net/310519663449376037/iyZgf5CgymBq6EtTfh66yp/liszt_portrait_bg-awZFnxUtESUWuuZgaR9x6D.webp";
 const LOGO_TREBLE = "https://d2xsxph8kpxj0f.cloudfront.net/310519663449376037/iyZgf5CgymBq6EtTfh66yp/logo_treble-Ys7HU4Ydwkc3JS4KPHV5db.webp";
+
+const STORAGE_KEY = "la-campanella-progress-v1";
 
 // ── Nav sections ─────────────────────────────────────────────────────────────
 const NAV_ITEMS = [
@@ -151,12 +153,15 @@ const WEEKS = [
   },
 ];
 
+const ALL_DAYS = WEEKS.flatMap((w) => w.days.map((d) => d.day));
+const TOTAL_DAYS = ALL_DAYS.length; // 30
+
 // ── Milestones ────────────────────────────────────────────────────────────────
 const MILESTONES = [
-  { date: "Day 7",  label: "All sections HS at 50% tempo",      benchmark: "No stopping; all notes present" },
-  { date: "Day 14", label: "Full piece HT at 60% tempo",         benchmark: "Acceptable accuracy; no major memory gaps" },
+  { date: "Day 7",  label: "All sections HS at 50% tempo",       benchmark: "No stopping; all notes present" },
+  { date: "Day 14", label: "Full piece HT at 60% tempo",          benchmark: "Acceptable accuracy; no major memory gaps" },
   { date: "Day 21", label: "Hardest passages clean at 70% tempo", benchmark: "Leaps, trills, and chromatics all under control" },
-  { date: "Day 30", label: "Full musical performance at 85–90%", benchmark: "No stopping; musical expression present" },
+  { date: "Day 30", label: "Full musical performance at 85–90%",  benchmark: "No stopping; musical expression present" },
 ];
 
 // ── Session structure ─────────────────────────────────────────────────────────
@@ -167,6 +172,41 @@ const SESSION_BLOCKS = [
   { block: "Run-through / Endurance",  duration: "20–30 min", purpose: "Full or partial run-throughs at increasing tempo" },
   { block: "Cool-down",                duration: "5 min",     purpose: "Slow, gentle playing; shake out the hands" },
 ];
+
+// ── Progress hook (localStorage) ─────────────────────────────────────────────
+function useProgress() {
+  const [completed, setCompleted] = useState<Set<number>>(() => {
+    try {
+      const raw = localStorage.getItem(STORAGE_KEY);
+      if (raw) return new Set<number>(JSON.parse(raw));
+    } catch {}
+    return new Set<number>();
+  });
+
+  // Persist on every change
+  useEffect(() => {
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(Array.from(completed)));
+    } catch {}
+  }, [completed]);
+
+  const toggle = useCallback((day: number) => {
+    setCompleted((prev) => {
+      const next = new Set(prev);
+      if (next.has(day)) next.delete(day);
+      else next.add(day);
+      return next;
+    });
+  }, []);
+
+  const reset = useCallback(() => {
+    if (window.confirm("Reset all progress? This cannot be undone.")) {
+      setCompleted(new Set());
+    }
+  }, []);
+
+  return { completed, toggle, reset };
+}
 
 // ── Scroll-spy hook ───────────────────────────────────────────────────────────
 function useScrollSpy(ids: string[]) {
@@ -188,7 +228,7 @@ function useScrollSpy(ids: string[]) {
   return active;
 }
 
-// ── Bell ornament ────────────────────────────────────────────────────────────
+// ── Bell ornament ─────────────────────────────────────────────────────────────
 function BellOrnament({ label }: { label: string }) {
   return (
     <div className="flex items-center gap-4 mb-6">
@@ -236,24 +276,141 @@ function SectionLabel({ children }: { children: React.ReactNode }) {
   return <p className="section-label mb-3">{children}</p>;
 }
 
-// ── Day Card (accordion) ──────────────────────────────────────────────────────
-function DayCard({ day, focus, goal }: { day: number; focus: string; goal: string }) {
+// ── Overall Progress Ring ─────────────────────────────────────────────────────
+function ProgressRing({ done, total }: { done: number; total: number }) {
+  const pct = total > 0 ? done / total : 0;
+  const r = 42;
+  const circ = 2 * Math.PI * r;
+  const dash = circ * pct;
+  return (
+    <div className="flex flex-col items-center">
+      <svg width="110" height="110" viewBox="0 0 110 110" className="-rotate-90">
+        {/* Track */}
+        <circle cx="55" cy="55" r={r} fill="none" stroke="oklch(0.24 0.016 265)" strokeWidth="8" />
+        {/* Progress arc */}
+        <circle
+          cx="55" cy="55" r={r}
+          fill="none"
+          stroke="oklch(0.78 0.12 85)"
+          strokeWidth="8"
+          strokeLinecap="round"
+          strokeDasharray={`${dash} ${circ}`}
+          style={{ transition: "stroke-dasharray 0.6s cubic-bezier(0.23,1,0.32,1)" }}
+        />
+      </svg>
+      <div className="absolute flex flex-col items-center justify-center" style={{ marginTop: "-82px" }}>
+        <span className="font-['JetBrains_Mono'] text-2xl font-bold text-[oklch(0.78_0.12_85)]">{done}</span>
+        <span className="font-['JetBrains_Mono'] text-[0.6rem] text-[oklch(0.50_0.012_265)] uppercase tracking-widest">of {total}</span>
+      </div>
+    </div>
+  );
+}
+
+// ── Week Progress Bar ─────────────────────────────────────────────────────────
+function WeekProgressBar({ done, total, colorL }: { done: number; total: number; colorL: number }) {
+  const pct = total > 0 ? (done / total) * 100 : 0;
+  return (
+    <div className="flex items-center gap-3 mt-3">
+      <div className="flex-1 h-1.5 rounded-full bg-[oklch(0.22_0.014_265)] overflow-hidden">
+        <div
+          className="h-full rounded-full transition-all duration-500 ease-out"
+          style={{
+            width: `${pct}%`,
+            background: `oklch(${colorL} 0.10 85)`,
+          }}
+        />
+      </div>
+      <span className="font-['JetBrains_Mono'] text-[0.65rem] text-[oklch(0.50_0.012_265)] shrink-0 w-12 text-right">
+        {done}/{total}
+      </span>
+    </div>
+  );
+}
+
+// ── Day Card with checkbox ────────────────────────────────────────────────────
+function DayCard({
+  day, focus, goal, completed, onToggle,
+}: {
+  day: number; focus: string; goal: string; completed: boolean; onToggle: (day: number) => void;
+}) {
   const [open, setOpen] = useState(false);
+
   return (
     <div
-      className={`nocturne-card overflow-hidden transition-all duration-200 ${open ? "border-[oklch(0.50_0.06_85)]" : ""}`}
+      className={`nocturne-card overflow-hidden transition-all duration-200 ${
+        completed
+          ? "border-[oklch(0.50_0.08_85/0.5)] bg-[oklch(0.15_0.014_265)]"
+          : open
+          ? "border-[oklch(0.50_0.06_85)]"
+          : ""
+      }`}
     >
-      <button
-        onClick={() => setOpen(!open)}
-        className="w-full flex items-center gap-4 px-5 py-4 text-left hover:bg-[oklch(0.20_0.014_265)] transition-colors"
-      >
-        <span className="font-mono text-xs text-[oklch(0.78_0.12_85)] w-10 shrink-0">D{day}</span>
-        <span className="text-sm font-semibold text-[oklch(0.88_0.01_85)] flex-1">{focus}</span>
-        {open ? <ChevronUp size={14} className="text-[oklch(0.58_0.015_265)] shrink-0" /> : <ChevronDown size={14} className="text-[oklch(0.58_0.015_265)] shrink-0" />}
-      </button>
+      <div className="flex items-center gap-0">
+        {/* Checkbox area */}
+        <button
+          onClick={() => onToggle(day)}
+          aria-label={completed ? `Mark Day ${day} incomplete` : `Mark Day ${day} complete`}
+          className="flex items-center justify-center w-14 h-full py-4 shrink-0 hover:bg-[oklch(0.20_0.014_265)] transition-colors group"
+        >
+          {completed ? (
+            <CheckCircle2
+              size={18}
+              className="text-[oklch(0.78_0.12_85)] transition-transform duration-150 group-hover:scale-110"
+            />
+          ) : (
+            <Circle
+              size={18}
+              className="text-[oklch(0.35_0.014_265)] group-hover:text-[oklch(0.55_0.06_85)] transition-colors"
+            />
+          )}
+        </button>
+
+        {/* Expand button */}
+        <button
+          onClick={() => setOpen(!open)}
+          className="flex-1 flex items-center gap-3 px-3 py-4 text-left hover:bg-[oklch(0.20_0.014_265)] transition-colors"
+        >
+          <span
+            className={`font-mono text-xs w-8 shrink-0 transition-colors ${
+              completed ? "text-[oklch(0.78_0.12_85)]" : "text-[oklch(0.50_0.012_265)]"
+            }`}
+          >
+            D{day}
+          </span>
+          <span
+            className={`text-sm font-semibold flex-1 transition-colors ${
+              completed
+                ? "text-[oklch(0.60_0.015_265)] line-through decoration-[oklch(0.50_0.08_85/0.5)]"
+                : "text-[oklch(0.88_0.01_85)]"
+            }`}
+          >
+            {focus}
+          </span>
+          {completed && (
+            <span className="text-[0.6rem] font-['JetBrains_Mono'] text-[oklch(0.78_0.12_85)] uppercase tracking-wider shrink-0 mr-1">
+              Done
+            </span>
+          )}
+          {open ? (
+            <ChevronUp size={14} className="text-[oklch(0.58_0.015_265)] shrink-0" />
+          ) : (
+            <ChevronDown size={14} className="text-[oklch(0.58_0.015_265)] shrink-0" />
+          )}
+        </button>
+      </div>
+
       {open && (
-        <div className="px-5 pb-4 pt-1 border-t border-[oklch(0.24_0.016_265)]">
+        <div className="px-5 pb-4 pt-1 border-t border-[oklch(0.24_0.016_265)] ml-14">
           <p className="text-sm text-[oklch(0.75_0.01_85)] leading-relaxed">{goal}</p>
+          {!completed && (
+            <button
+              onClick={() => { onToggle(day); setOpen(false); }}
+              className="mt-3 inline-flex items-center gap-2 text-xs font-['JetBrains_Mono'] text-[oklch(0.78_0.12_85)] border border-[oklch(0.78_0.12_85/0.3)] px-3 py-1.5 rounded hover:bg-[oklch(0.78_0.12_85/0.08)] transition-colors"
+            >
+              <CheckCircle2 size={12} />
+              Mark as complete
+            </button>
+          )}
         </div>
       )}
     </div>
@@ -264,6 +421,10 @@ function DayCard({ day, focus, goal }: { day: number; focus: string; goal: strin
 export default function Home() {
   const activeSection = useScrollSpy(NAV_ITEMS.map((n) => n.id));
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
+  const { completed, toggle, reset } = useProgress();
+
+  const totalDone = completed.size;
+  const overallPct = Math.round((totalDone / TOTAL_DAYS) * 100);
 
   const scrollTo = (id: string) => {
     document.getElementById(id)?.scrollIntoView({ behavior: "smooth" });
@@ -275,14 +436,11 @@ export default function Home() {
 
       {/* ── HERO ─────────────────────────────────────────────────────────── */}
       <header className="relative min-h-screen flex flex-col justify-end overflow-hidden">
-        {/* Background image */}
         <div
           className="absolute inset-0 bg-cover bg-center bg-no-repeat"
           style={{ backgroundImage: `url(${HERO_BG})` }}
         />
-        {/* Gradient overlay */}
         <div className="absolute inset-0 bg-gradient-to-b from-[oklch(0.12_0.018_265/0.3)] via-[oklch(0.12_0.018_265/0.5)] to-[oklch(0.12_0.018_265)]" />
-        {/* Radial spotlight glow */}
         <div className="absolute inset-0 bg-[radial-gradient(ellipse_60%_50%_at_50%_40%,oklch(0.78_0.12_85/0.06),transparent)]" />
 
         {/* Top nav bar */}
@@ -293,7 +451,24 @@ export default function Home() {
               La Campanella
             </span>
           </div>
-          {/* Mobile nav toggle */}
+          {/* Progress pill in nav */}
+          {totalDone > 0 && (
+            <button
+              onClick={() => scrollTo("framework")}
+              className="hidden sm:flex items-center gap-2 border border-[oklch(0.78_0.12_85/0.35)] rounded-full px-4 py-1.5 hover:border-[oklch(0.78_0.12_85/0.7)] transition-colors"
+            >
+              <span className="font-['JetBrains_Mono'] text-[0.65rem] text-[oklch(0.78_0.12_85)]">
+                {totalDone}/{TOTAL_DAYS} days
+              </span>
+              <div className="w-16 h-1 rounded-full bg-[oklch(0.24_0.016_265)] overflow-hidden">
+                <div
+                  className="h-full rounded-full bg-[oklch(0.78_0.12_85)] transition-all duration-500"
+                  style={{ width: `${overallPct}%` }}
+                />
+              </div>
+              <span className="font-['JetBrains_Mono'] text-[0.65rem] text-[oklch(0.60_0.08_85)]">{overallPct}%</span>
+            </button>
+          )}
           <button
             onClick={() => setMobileNavOpen(!mobileNavOpen)}
             className="lg:hidden text-[oklch(0.78_0.12_85)] p-2"
@@ -376,8 +551,35 @@ export default function Home() {
               </button>
             ))}
           </nav>
-          <div className="mt-auto pt-10">
-            <div className="gold-rule mb-6" />
+
+          {/* Sidebar progress widget */}
+          <div className="mt-8 pt-6 border-t border-[oklch(0.24_0.016_265)]">
+            <p className="font-['JetBrains_Mono'] text-[0.6rem] text-[oklch(0.50_0.012_265)] uppercase tracking-widest mb-4">
+              Your Progress
+            </p>
+            <div className="relative flex justify-center mb-2">
+              <ProgressRing done={totalDone} total={TOTAL_DAYS} />
+            </div>
+            <p className="text-center font-['Playfair_Display'] text-sm text-[oklch(0.75_0.01_85)] mt-2">
+              {totalDone === 0
+                ? "Begin your journey"
+                : totalDone === TOTAL_DAYS
+                ? "La Campanella — conquered."
+                : `${TOTAL_DAYS - totalDone} days remaining`}
+            </p>
+            {totalDone > 0 && (
+              <button
+                onClick={reset}
+                className="mt-4 w-full flex items-center justify-center gap-2 text-xs text-[oklch(0.40_0.012_265)] hover:text-[oklch(0.60_0.015_265)] transition-colors py-1"
+              >
+                <RotateCcw size={10} />
+                Reset progress
+              </button>
+            )}
+          </div>
+
+          <div className="mt-auto pt-6">
+            <div className="gold-rule mb-4" />
             <p className="text-xs text-[oklch(0.40_0.012_265)] leading-relaxed">
               G-sharp minor · S. 141 · 1851<br />
               <span className="italic">Allegretto</span>
@@ -401,6 +603,18 @@ export default function Home() {
                 </button>
               ))}
             </nav>
+            {/* Mobile progress */}
+            <div className="mt-8 pt-6 border-t border-[oklch(0.24_0.016_265)]">
+              <p className="font-['JetBrains_Mono'] text-xs text-[oklch(0.78_0.12_85)] mb-2">
+                Progress: {totalDone}/{TOTAL_DAYS} days ({overallPct}%)
+              </p>
+              <div className="w-full h-2 rounded-full bg-[oklch(0.22_0.014_265)] overflow-hidden">
+                <div
+                  className="h-full rounded-full bg-[oklch(0.78_0.12_85)] transition-all duration-500"
+                  style={{ width: `${overallPct}%` }}
+                />
+              </div>
+            </div>
           </div>
         )}
 
@@ -415,7 +629,6 @@ export default function Home() {
                 Historical &amp; Compositional Context
               </h2>
 
-              {/* Portrait + intro text */}
               <div className="grid lg:grid-cols-5 gap-8 mb-10">
                 <div className="lg:col-span-3 space-y-5 text-[oklch(0.75_0.01_85)] leading-relaxed">
                   <p>
@@ -445,7 +658,6 @@ export default function Home() {
                 </div>
               </div>
 
-              {/* Three versions table */}
               <h3 className="font-['Playfair_Display'] font-semibold text-2xl text-[oklch(0.88_0.01_85)] mb-4">The Three Versions</h3>
               <p className="text-[oklch(0.65_0.015_265)] mb-6 leading-relaxed">
                 Liszt's adaptation went through three distinct versions, each representing a refinement of both technique and musical taste. The 1851 version — universally performed today — reflects Liszt at the height of his compositional maturity, with the key of G-sharp minor chosen deliberately so that the large leaps land predominantly on black keys, which are slightly raised and easier to target at speed.
@@ -563,6 +775,90 @@ export default function Home() {
                 This framework assumes you can read through the piece slowly (at roughly 40–50% of final tempo) and are familiar with the key of G-sharp minor. Each session is designed to last <strong className="text-[oklch(0.88_0.01_85)]">2 to 2.5 hours</strong> of dedicated practice daily.
               </p>
 
+              {/* ── PROGRESS DASHBOARD ─────────────────────────────────────── */}
+              <div className="nocturne-card p-6 mb-12 border-[oklch(0.78_0.12_85/0.2)]">
+                <div className="flex items-center justify-between mb-5">
+                  <div>
+                    <p className="font-['JetBrains_Mono'] text-[0.6rem] text-[oklch(0.50_0.012_265)] uppercase tracking-widest mb-1">
+                      Practice Tracker
+                    </p>
+                    <h3 className="font-['Playfair_Display'] font-semibold text-xl text-[oklch(0.88_0.01_85)]">
+                      Your 30-Day Progress
+                    </h3>
+                  </div>
+                  <div className="text-right">
+                    <p className="font-['JetBrains_Mono'] text-3xl font-bold text-[oklch(0.78_0.12_85)]">{overallPct}%</p>
+                    <p className="font-['JetBrains_Mono'] text-xs text-[oklch(0.50_0.012_265)]">{totalDone} of {TOTAL_DAYS} days</p>
+                  </div>
+                </div>
+
+                {/* Master progress bar */}
+                <div className="w-full h-3 rounded-full bg-[oklch(0.22_0.014_265)] overflow-hidden mb-5">
+                  <div
+                    className="h-full rounded-full transition-all duration-700 ease-out"
+                    style={{
+                      width: `${overallPct}%`,
+                      background: "linear-gradient(to right, oklch(0.60 0.08 85), oklch(0.78 0.12 85))",
+                    }}
+                  />
+                </div>
+
+                {/* Day grid — 30 cells */}
+                <div className="grid grid-cols-10 gap-1.5 mb-5">
+                  {ALL_DAYS.map((day) => {
+                    const done = completed.has(day);
+                    const weekIdx = WEEKS.findIndex((w) => w.days.some((d) => d.day === day));
+                    const weekColors = ["oklch(0.78 0.12 85)", "oklch(0.70 0.10 85)", "oklch(0.62 0.09 85)", "oklch(0.55 0.08 85)"];
+                    return (
+                      <button
+                        key={day}
+                        onClick={() => toggle(day)}
+                        title={`Day ${day} — click to toggle`}
+                        className={`aspect-square rounded flex items-center justify-center text-[0.55rem] font-['JetBrains_Mono'] font-bold transition-all duration-150 hover:scale-110 active:scale-95 ${
+                          done
+                            ? "text-[oklch(0.12_0.018_265)]"
+                            : "text-[oklch(0.40_0.012_265)] border border-[oklch(0.24_0.016_265)] hover:border-[oklch(0.50_0.06_85)]"
+                        }`}
+                        style={done ? { background: weekColors[weekIdx] } : {}}
+                      >
+                        {day}
+                      </button>
+                    );
+                  })}
+                </div>
+
+                {/* Week breakdown bars */}
+                <div className="grid sm:grid-cols-4 gap-4">
+                  {WEEKS.map((week, wi) => {
+                    const weekDone = week.days.filter((d) => completed.has(d.day)).length;
+                    const colorL = 0.78 - wi * 0.06;
+                    return (
+                      <div key={week.week} className="bg-[oklch(0.14_0.016_265)] rounded-lg p-3">
+                        <p className="font-['JetBrains_Mono'] text-[0.6rem] text-[oklch(0.50_0.012_265)] uppercase tracking-widest mb-0.5">
+                          Week {week.week}
+                        </p>
+                        <p className="font-['Playfair_Display'] text-sm font-semibold text-[oklch(0.82_0.01_85)] leading-tight mb-1">
+                          {week.title}
+                        </p>
+                        <WeekProgressBar done={weekDone} total={week.days.length} colorL={colorL} />
+                      </div>
+                    );
+                  })}
+                </div>
+
+                {totalDone > 0 && (
+                  <div className="mt-4 flex justify-end">
+                    <button
+                      onClick={reset}
+                      className="flex items-center gap-1.5 text-xs text-[oklch(0.38_0.012_265)] hover:text-[oklch(0.55_0.015_265)] transition-colors"
+                    >
+                      <RotateCcw size={11} />
+                      Reset all progress
+                    </button>
+                  </div>
+                )}
+              </div>
+
               {/* Daily session structure */}
               <h3 className="font-['Playfair_Display'] font-semibold text-2xl text-[oklch(0.88_0.01_85)] mb-5">Daily Session Structure</h3>
               <div className="overflow-x-auto mb-14">
@@ -589,53 +885,83 @@ export default function Home() {
               {/* Milestone tracker — horizontal timeline */}
               <h3 className="font-['Playfair_Display'] font-semibold text-2xl text-[oklch(0.88_0.01_85)] mb-6">Milestone Summary</h3>
               <div className="relative mb-14">
-                {/* Connecting line */}
                 <div className="hidden sm:block absolute top-6 left-0 right-0 h-px bg-gradient-to-r from-transparent via-[oklch(0.78_0.12_85/0.35)] to-transparent" />
                 <div className="grid sm:grid-cols-4 gap-6">
-                  {MILESTONES.map((m, i) => (
-                    <div key={i} className="relative flex flex-col items-center text-center">
-                      {/* Node */}
-                      <div className="w-12 h-12 rounded-full border-2 border-[oklch(0.78_0.12_85)] bg-[oklch(0.17_0.016_265)] flex items-center justify-center mb-4 z-10 animate-glow-pulse" style={{ animationDelay: `${i * 1}s` }}>
-                        <span className="font-['JetBrains_Mono'] text-[oklch(0.78_0.12_85)] text-xs font-bold">{i + 1}</span>
+                  {MILESTONES.map((m, i) => {
+                    const milestoneDay = [7, 14, 21, 30][i];
+                    const reached = completed.has(milestoneDay);
+                    return (
+                      <div key={i} className="relative flex flex-col items-center text-center">
+                        <div
+                          className={`w-12 h-12 rounded-full border-2 flex items-center justify-center mb-4 z-10 transition-all duration-500 ${
+                            reached
+                              ? "border-[oklch(0.78_0.12_85)] bg-[oklch(0.78_0.12_85/0.15)]"
+                              : "border-[oklch(0.35_0.014_265)] bg-[oklch(0.17_0.016_265)]"
+                          }`}
+                        >
+                          {reached ? (
+                            <CheckCircle2 size={20} className="text-[oklch(0.78_0.12_85)]" />
+                          ) : (
+                            <span className="font-['JetBrains_Mono'] text-[oklch(0.40_0.012_265)] text-xs font-bold">{i + 1}</span>
+                          )}
+                        </div>
+                        <p className={`font-['JetBrains_Mono'] text-xs font-bold mb-1 ${reached ? "text-[oklch(0.78_0.12_85)]" : "text-[oklch(0.50_0.012_265)]"}`}>
+                          {m.date}
+                        </p>
+                        <p className="text-[oklch(0.82_0.01_85)] text-sm font-semibold mb-1 leading-snug">{m.label}</p>
+                        <p className="text-[oklch(0.48_0.012_265)] text-xs leading-relaxed">{m.benchmark}</p>
                       </div>
-                      <p className="font-['JetBrains_Mono'] text-[oklch(0.78_0.12_85)] text-xs font-bold mb-1">{m.date}</p>
-                      <p className="text-[oklch(0.82_0.01_85)] text-sm font-semibold mb-1 leading-snug">{m.label}</p>
-                      <p className="text-[oklch(0.48_0.012_265)] text-xs leading-relaxed">{m.benchmark}</p>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               </div>
 
               {/* Weekly schedules — score-map style */}
-              {WEEKS.map((week, wi) => (
-                <div key={week.week} className="mb-14">
-                  {/* Week header band */}
-                  <div className={`flex items-stretch gap-0 mb-6 rounded-lg overflow-hidden border border-[oklch(0.28_0.018_265)]`}>
-                    <div className="w-2 shrink-0" style={{ background: `oklch(${0.78 - wi * 0.08} ${0.12 - wi * 0.02} 85)` }} />
-                    <div className="flex-1 px-6 py-5">
-                      <div className="flex items-baseline gap-3 mb-1">
-                        <span className="font-['JetBrains_Mono'] text-[0.65rem] text-[oklch(0.78_0.12_85)] uppercase tracking-[0.2em]">Week {week.week} · Days {week.days[0].day}–{week.days[week.days.length - 1].day}</span>
-                      </div>
-                      <h3 className="font-['Playfair_Display'] font-bold text-xl text-[oklch(0.90_0.01_85)] mb-2">{week.title}</h3>
-                      <p className="text-[oklch(0.60_0.015_265)] text-sm leading-relaxed mb-3">{week.goal}</p>
-                      <div className="flex flex-wrap gap-x-6 gap-y-1">
-                        <p className="text-xs text-[oklch(0.48_0.012_265)]">
-                          <span className="text-[oklch(0.60_0.08_85)] font-semibold">Milestone: </span>{week.milestone}
-                        </p>
-                        <p className="text-xs text-[oklch(0.48_0.012_265)]">
-                          <span className="text-[oklch(0.60_0.08_85)] font-semibold">Hanon: </span>{week.hanon}
-                        </p>
+              {WEEKS.map((week, wi) => {
+                const weekDone = week.days.filter((d) => completed.has(d.day)).length;
+                const colorL = 0.78 - wi * 0.08;
+                return (
+                  <div key={week.week} className="mb-14">
+                    <div className="flex items-stretch gap-0 mb-3 rounded-lg overflow-hidden border border-[oklch(0.28_0.018_265)]">
+                      <div className="w-2 shrink-0" style={{ background: `oklch(${colorL} ${0.12 - wi * 0.02} 85)` }} />
+                      <div className="flex-1 px-6 py-5">
+                        <div className="flex items-center justify-between mb-1">
+                          <span className="font-['JetBrains_Mono'] text-[0.65rem] text-[oklch(0.78_0.12_85)] uppercase tracking-[0.2em]">
+                            Week {week.week} · Days {week.days[0].day}–{week.days[week.days.length - 1].day}
+                          </span>
+                          <span className="font-['JetBrains_Mono'] text-[0.65rem] text-[oklch(0.50_0.012_265)]">
+                            {weekDone}/{week.days.length} complete
+                          </span>
+                        </div>
+                        <h3 className="font-['Playfair_Display'] font-bold text-xl text-[oklch(0.90_0.01_85)] mb-2">{week.title}</h3>
+                        <p className="text-[oklch(0.60_0.015_265)] text-sm leading-relaxed mb-2">{week.goal}</p>
+                        <div className="flex flex-wrap gap-x-6 gap-y-1 mb-2">
+                          <p className="text-xs text-[oklch(0.48_0.012_265)]">
+                            <span className="text-[oklch(0.60_0.08_85)] font-semibold">Milestone: </span>{week.milestone}
+                          </p>
+                          <p className="text-xs text-[oklch(0.48_0.012_265)]">
+                            <span className="text-[oklch(0.60_0.08_85)] font-semibold">Hanon: </span>{week.hanon}
+                          </p>
+                        </div>
+                        {/* Week progress bar inside header */}
+                        <WeekProgressBar done={weekDone} total={week.days.length} colorL={colorL} />
                       </div>
                     </div>
+                    <div className="grid gap-2">
+                      {week.days.map((d) => (
+                        <DayCard
+                          key={d.day}
+                          day={d.day}
+                          focus={d.focus}
+                          goal={d.goal}
+                          completed={completed.has(d.day)}
+                          onToggle={toggle}
+                        />
+                      ))}
+                    </div>
                   </div>
-                  {/* Day grid */}
-                  <div className="grid gap-2">
-                    {week.days.map((d) => (
-                      <DayCard key={d.day} day={d.day} focus={d.focus} goal={d.goal} />
-                    ))}
-                  </div>
-                </div>
-              ))}
+                );
+              })}
             </AnimatedSection>
 
             <GoldRule />
