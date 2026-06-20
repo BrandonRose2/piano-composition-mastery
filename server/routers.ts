@@ -65,18 +65,31 @@ export const appRouter = router({
         const extractedText = input.extractedText;
         const fileName = input.fileName;
 
-        setImmediate(async () => {
+        const mimeType = input.mimeType;
+        // Build a public URL for the file so the AI can read the actual score
+        const publicFileUrl = `${process.env.BUILT_IN_FORGE_API_URL?.replace(/\/+$/, '') ?? ''}/v1/storage/file/${key}`;
+
+        // Use setTimeout(0) instead of setImmediate for broader runtime compatibility
+        setTimeout(async () => {
           try {
+            console.log(`[Analysis] Starting analysis for composition ${compositionId}: ${fileName}`);
             await updateCompositionStatus(compositionId, "analyzing");
-            const { analysis, framework } = await analyzeComposition(fileName, extractedText);
+            const { analysis, framework } = await analyzeComposition(
+              fileName,
+              extractedText,
+              publicFileUrl,
+              mimeType
+            );
             await updateCompositionStatus(compositionId, "complete", { analysis, framework });
+            console.log(`[Analysis] Completed for composition ${compositionId}`);
           } catch (err) {
-            console.error("[Analysis] Failed:", err);
+            const errMsg = err instanceof Error ? err.message : String(err);
+            console.error(`[Analysis] Failed for composition ${compositionId}:`, errMsg);
             await updateCompositionStatus(compositionId, "error", {
-              errorMessage: err instanceof Error ? err.message : "Unknown error",
-            });
+              errorMessage: errMsg,
+            }).catch(dbErr => console.error("[Analysis] Failed to update error status:", dbErr));
           }
-        });
+        }, 0);
 
         return composition;
       }),

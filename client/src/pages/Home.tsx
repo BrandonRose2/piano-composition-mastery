@@ -164,16 +164,20 @@ function CompositionCard({ composition }: { composition: any }) {
   const [, navigate] = useLocation();
   const analysis = composition.analysis as any;
 
-  // Poll if analyzing
+  // Poll while pending or analyzing; also poll once on error to get the message
   const { data: statusData } = trpc.compositions.status.useQuery(
     { id: composition.id },
     {
-      enabled: composition.status === "analyzing" || composition.status === "pending",
-      refetchInterval: 3000,
+      enabled: composition.status === "analyzing" || composition.status === "pending" || composition.status === "error",
+      refetchInterval: (query) => {
+        const s = (query.state.data as any)?.status;
+        return (s === "analyzing" || s === "pending") ? 3000 : false;
+      },
     }
   );
 
   const currentStatus = statusData?.status ?? composition.status;
+  const errorMsg = statusData?.errorMessage ?? null;
 
   return (
     <button
@@ -206,7 +210,9 @@ function CompositionCard({ composition }: { composition: any }) {
           ) : currentStatus === "analyzing" ? (
             <p className="text-xs text-amber-400/70 italic">AI is generating your analysis and 30-day framework…</p>
           ) : currentStatus === "error" ? (
-            <p className="text-xs text-red-400/70 italic">Analysis failed. Please try uploading again.</p>
+            <p className="text-xs text-red-400/70 italic">
+              {errorMsg ? `Error: ${errorMsg.slice(0, 120)}` : "Analysis failed. Please try uploading again."}
+            </p>
           ) : (
             <p className="text-xs text-[oklch(0.40_0.012_265)] italic">Queued for analysis…</p>
           )}
