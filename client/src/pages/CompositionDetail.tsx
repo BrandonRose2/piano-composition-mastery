@@ -9,13 +9,14 @@ import { trpc } from "@/lib/trpc";
 import {
   ChevronDown, ChevronUp, ChevronLeft, Music, BookOpen, Dumbbell, Calendar,
   Info, CheckCircle2, Circle, RotateCcw, Loader2, AlertCircle, Youtube, CalendarDays, X, FileMusic,
-  Columns2, PanelLeftClose, Play, Eye, Clock, User
+  Columns2, PanelLeftClose, Play, Eye, Clock, User, Timer
 } from "lucide-react";
 import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from "@/components/ui/resizable";
 import { Calendar as CalendarPicker } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { format, addDays } from "date-fns";
 import ScoreViewer from "@/components/ScoreViewer";
+import Metronome from "@/components/Metronome";
 
 const LOGO_TREBLE = "https://d2xsxph8kpxj0f.cloudfront.net/310519663449376037/iyZgf5CgymBq6EtTfh66yp/logo_treble-Ys7HU4Ydwkc3JS4KPHV5db.webp";
 const HERO_BG = "https://d2xsxph8kpxj0f.cloudfront.net/310519663449376037/iyZgf5CgymBq6EtTfh66yp/hero_bg-DDCWpXMzKGFmMUM3oU8SpS.webp";
@@ -354,6 +355,7 @@ export default function CompositionDetail() {
 
   const [datePickerOpen, setDatePickerOpen] = useState(false);
   const [splitScreen, setSplitScreen] = useState(false);
+  const [metronomeOpen, setMetronomeOpen] = useState(false);
 
   useEffect(() => {
     try {
@@ -1065,6 +1067,79 @@ export default function CompositionDetail() {
           </div>
         </main>
       </div>
+
+      {/* ── Floating Metronome Widget ─────────────────────────────────────── */}
+      <div
+        style={{
+          position: "fixed",
+          bottom: "1.5rem",
+          right: "1.5rem",
+          zIndex: 50,
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "flex-end",
+          gap: "0.5rem",
+        }}
+      >
+        {/* Expanded metronome panel */}
+        {metronomeOpen && (
+          <div
+            style={{
+              background: "oklch(0.14 0.018 265)",
+              border: "1px solid oklch(0.78 0.12 85 / 0.35)",
+              borderRadius: "1rem",
+              padding: "1.25rem",
+              boxShadow: "0 8px 40px oklch(0 0 0 / 0.6), 0 0 0 1px oklch(0.78 0.12 85 / 0.10)",
+              width: "280px",
+              animation: "fadeInUp 180ms cubic-bezier(0.23,1,0.32,1)",
+            }}
+          >
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "0.75rem" }}>
+              <span style={{ fontFamily: "'Playfair Display', serif", fontSize: "0.85rem", color: "oklch(0.78 0.12 85)", fontWeight: 600, letterSpacing: "0.05em" }}>
+                ♩ Metronome
+              </span>
+              <button
+                onClick={() => setMetronomeOpen(false)}
+                style={{ color: "oklch(0.55 0.012 265)", background: "none", border: "none", cursor: "pointer", padding: "0.1rem", lineHeight: 1 }}
+                aria-label="Close metronome"
+              >
+                <X size={14} />
+              </button>
+            </div>
+            <Metronome />
+          </div>
+        )}
+
+        {/* Toggle button */}
+        <button
+          onClick={() => setMetronomeOpen((o) => !o)}
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: "0.4rem",
+            padding: "0.55rem 1rem",
+            borderRadius: "2rem",
+            background: metronomeOpen
+              ? "oklch(0.78 0.12 85)"
+              : "oklch(0.16 0.018 265)",
+            border: "1px solid oklch(0.78 0.12 85 / 0.50)",
+            color: metronomeOpen ? "oklch(0.12 0.015 265)" : "oklch(0.78 0.12 85)",
+            fontSize: "0.72rem",
+            fontFamily: "'JetBrains Mono', monospace",
+            fontWeight: 700,
+            letterSpacing: "0.08em",
+            textTransform: "uppercase",
+            cursor: "pointer",
+            boxShadow: "0 4px 20px oklch(0 0 0 / 0.4)",
+            transition: "all 160ms cubic-bezier(0.23,1,0.32,1)",
+          }}
+          aria-label="Toggle metronome"
+        >
+          <Timer size={13} />
+          {metronomeOpen ? "Close" : "Metronome"}
+        </button>
+      </div>
+
     </div>
   );
 }
