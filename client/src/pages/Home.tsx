@@ -8,12 +8,136 @@ import { useState, useCallback, useRef, useEffect } from "react";
 import { useLocation } from "wouter";
 import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
-import { Music, Upload, BookOpen, ChevronRight, Loader2, AlertCircle, CheckCircle2, Clock, Trash2, Youtube, ExternalLink, LogOut, User } from "lucide-react";
+import { Music, Upload, BookOpen, ChevronRight, Loader2, AlertCircle, CheckCircle2, Clock, Trash2, Youtube, ExternalLink, LogOut, User, Search, FileText, ExternalLink as LinkIcon, X } from "lucide-react";
 import { useAuth } from "@/_core/hooks/useAuth";
 
 // ── Asset URLs ────────────────────────────────────────────────────────────────
 const HERO_BG = "https://d2xsxph8kpxj0f.cloudfront.net/310519663449376037/iyZgf5CgymBq6EtTfh66yp/hero_bg-DDCWpXMzKGFmMUM3oU8SpS.webp";
 const LOGO_TREBLE = "https://d2xsxph8kpxj0f.cloudfront.net/310519663449376037/iyZgf5CgymBq6EtTfh66yp/logo_treble-Ys7HU4Ydwkc3JS4KPHV5db.webp";
+
+// ── Sheet Music Search ───────────────────────────────────────────────────
+function SheetMusicSearch() {
+  const [query, setQuery] = useState("");
+  const [submitted, setSubmitted] = useState("");
+  const [open, setOpen] = useState(false);
+
+  const { data: results = [], isFetching } = trpc.sheetMusic.search.useQuery(
+    { query: submitted },
+    { enabled: submitted.length > 0 }
+  );
+
+  const handleSearch = (e: React.FormEvent) => {
+    e.preventDefault();
+    const q = query.trim();
+    if (!q) return;
+    setSubmitted(q);
+    setOpen(true);
+  };
+
+  const handleClear = () => {
+    setQuery("");
+    setSubmitted("");
+    setOpen(false);
+  };
+
+  return (
+    <div className="mb-16">
+      {/* Section header */}
+      <div className="flex items-center gap-3 mb-6">
+        <span className="text-[oklch(0.78_0.12_85)]">♪</span>
+        <div className="flex-1 h-px bg-gradient-to-r from-[oklch(0.78_0.12_85/0.4)] to-transparent" />
+        <p className="font-mono text-[0.6rem] text-[oklch(0.78_0.12_85)] uppercase tracking-[0.25em]">Find Sheet Music</p>
+        <div className="flex-1 h-px bg-gradient-to-l from-[oklch(0.78_0.12_85/0.4)] to-transparent" />
+        <span className="text-[oklch(0.78_0.12_85)]">♪</span>
+      </div>
+
+      {/* Search bar */}
+      <form onSubmit={handleSearch} className="relative">
+        <div className="relative flex items-center">
+          <Search size={16} className="absolute left-4 text-[oklch(0.50_0.012_265)] pointer-events-none" />
+          <input
+            type="text"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="Search for any piano composition or composer… e.g. Chopin Ballade No. 1"
+            className="w-full pl-10 pr-28 py-3.5 rounded-xl bg-[oklch(0.16_0.018_265)] border border-[oklch(0.26_0.016_265)] text-[oklch(0.88_0.01_85)] placeholder-[oklch(0.40_0.012_265)] text-sm focus:outline-none focus:border-[oklch(0.78_0.12_85/0.6)] focus:ring-1 focus:ring-[oklch(0.78_0.12_85/0.3)] transition-all"
+          />
+          {query && (
+            <button
+              type="button"
+              onClick={handleClear}
+              className="absolute right-[5.5rem] text-[oklch(0.40_0.012_265)] hover:text-[oklch(0.65_0.015_265)] transition-colors"
+            >
+              <X size={14} />
+            </button>
+          )}
+          <button
+            type="submit"
+            disabled={!query.trim() || isFetching}
+            className="absolute right-2 px-4 py-2 rounded-lg bg-[oklch(0.78_0.12_85)] text-[oklch(0.12_0.018_265)] text-xs font-mono font-bold uppercase tracking-wider hover:bg-[oklch(0.85_0.10_85)] disabled:opacity-50 disabled:cursor-not-allowed transition-all flex items-center gap-1.5"
+          >
+            {isFetching ? <Loader2 size={12} className="animate-spin" /> : <Search size={12} />}
+            Search
+          </button>
+        </div>
+        <p className="text-[0.65rem] text-[oklch(0.38_0.010_265)] mt-2 ml-1">
+          Searches IMSLP — the world’s largest free sheet music library. Results open on IMSLP where you can download the PDF.
+        </p>
+      </form>
+
+      {/* Results */}
+      {open && submitted && (
+        <div className="mt-5">
+          {isFetching ? (
+            <div className="nocturne-card p-8 text-center">
+              <Loader2 size={24} className="text-[oklch(0.78_0.12_85)] animate-spin mx-auto mb-3" />
+              <p className="text-sm text-[oklch(0.55_0.015_265)]">Searching IMSLP for “{submitted}”…</p>
+            </div>
+          ) : results.length === 0 ? (
+            <div className="nocturne-card p-8 text-center border-dashed">
+              <FileText size={28} className="text-[oklch(0.35_0.010_265)] mx-auto mb-3" />
+              <p className="text-sm text-[oklch(0.55_0.015_265)]">No results found for “{submitted}” on IMSLP.</p>
+              <p className="text-xs text-[oklch(0.38_0.010_265)] mt-1">Try a different spelling or search by composer name only.</p>
+            </div>
+          ) : (
+            <div className="grid gap-2">
+              <p className="text-[0.65rem] font-mono text-[oklch(0.45_0.012_265)] uppercase tracking-wider mb-1">
+                {results.length} result{results.length !== 1 ? "s" : ""} from IMSLP
+              </p>
+              {results.map((r, i) => (
+                <a
+                  key={i}
+                  href={r.pageUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="nocturne-card p-4 flex items-start gap-4 hover:border-[oklch(0.78_0.12_85/0.50)] hover:bg-[oklch(0.17_0.016_265)] transition-all duration-150 group/result"
+                >
+                  <div className="w-8 h-8 rounded-lg bg-[oklch(0.78_0.12_85/0.10)] border border-[oklch(0.78_0.12_85/0.20)] flex items-center justify-center shrink-0 mt-0.5">
+                    <FileText size={14} className="text-[oklch(0.78_0.12_85)]" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="font-['Playfair_Display'] font-semibold text-[oklch(0.88_0.01_85)] text-sm truncate group-hover/result:text-[oklch(0.78_0.12_85)] transition-colors">
+                      {r.title}
+                    </p>
+                    {r.snippet && (
+                      <p className="text-xs text-[oklch(0.45_0.012_265)] line-clamp-2 leading-relaxed mt-0.5">
+                        {r.snippet}
+                      </p>
+                    )}
+                    <p className="text-[0.6rem] font-mono text-[oklch(0.78_0.12_85/0.7)] mt-1.5 flex items-center gap-1">
+                      <ExternalLink size={9} /> Open on IMSLP — free PDF download
+                    </p>
+                  </div>
+                  <ExternalLink size={14} className="text-[oklch(0.35_0.010_265)] group-hover/result:text-[oklch(0.78_0.12_85)] transition-colors shrink-0 mt-1" />
+                </a>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
 
 // ── Nav Bar ──────────────────────────────────────────────────────────────────
 function NavBar() {
@@ -186,7 +310,7 @@ function UploadZone({ onUpload }: { onUpload: (file: File) => void }) {
 }
 
 // ── Composition Card ──────────────────────────────────────────────────────────
-function CompositionCard({ composition }: { composition: any }) {
+function CompositionCard({ composition, progressSummary }: { composition: any; progressSummary: { completedDays: number; totalDays: number; percentage: number } | null }) {
   const [, navigate] = useLocation();
   const [confirmDelete, setConfirmDelete] = useState(false);
   const analysis = composition.analysis as any;
@@ -265,6 +389,23 @@ function CompositionCard({ composition }: { composition: any }) {
               </p>
             ) : (
               <p className="text-xs text-[oklch(0.40_0.012_265)] italic">Queued for analysis…</p>
+            )}
+            {/* Progress bar — only shown for complete compositions that have been started */}
+            {currentStatus === "complete" && progressSummary && progressSummary.completedDays > 0 && (
+              <div className="mt-3">
+                <div className="flex items-center justify-between mb-1">
+                  <span className="text-[0.6rem] font-mono text-[oklch(0.78_0.12_85)] uppercase tracking-wider">30-Day Progress</span>
+                  <span className="text-[0.6rem] font-mono text-[oklch(0.78_0.12_85)]">
+                    {progressSummary.completedDays}/30 days · {progressSummary.percentage}%
+                  </span>
+                </div>
+                <div className="h-1.5 w-full rounded-full bg-[oklch(0.20_0.016_265)] overflow-hidden">
+                  <div
+                    className="h-full rounded-full bg-gradient-to-r from-[oklch(0.65_0.10_85)] to-[oklch(0.78_0.12_85)] transition-all duration-500"
+                    style={{ width: `${progressSummary.percentage}%` }}
+                  />
+                </div>
+              </div>
             )}
             <div className="flex items-center gap-3 mt-2">
               {analysis?.difficulty && (
@@ -357,6 +498,12 @@ export default function Home() {
   const utils = trpc.useUtils();
 
   const { data: compositions = [], isLoading } = trpc.compositions.list.useQuery();
+  const { data: progressSummaries = [] } = trpc.progress.summaryAll.useQuery();
+
+  // Build a lookup map: compositionId → { completedDays, percentage }
+  const progressMap = Object.fromEntries(
+    progressSummaries.map((s) => [s.compositionId, s])
+  );
 
   const uploadMutation = trpc.compositions.upload.useMutation({
     onSuccess: () => {
@@ -468,6 +615,9 @@ export default function Home() {
           )}
         </div>
 
+        {/* Sheet music search */}
+        <SheetMusicSearch />
+
         {/* Composition library */}
         <div>
           <div className="flex items-center gap-3 mb-6">
@@ -496,7 +646,11 @@ export default function Home() {
               </div>
             ) : (
               compositions.map((comp) => (
-                <CompositionCard key={comp.id} composition={comp} />
+                <CompositionCard
+                  key={comp.id}
+                  composition={comp}
+                  progressSummary={progressMap[comp.id] ?? null}
+                />
               ))
             )}
           </div>

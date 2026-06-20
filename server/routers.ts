@@ -164,7 +164,80 @@ export const appRouter = router({
       }),
   }),
 
+  sheetMusic: router({
+    /**
+     * Search IMSLP for free piano sheet music PDFs.
+     * Uses the IMSLP MediaWiki API to find works matching the query,
+     * then returns structured results with direct IMSLP page links.
+     */
+    search: publicProcedure
+      .input(z.object({ query: z.string().min(1).max(200) }))
+      .query(async ({ input }) => {
+        try {
+          const query = encodeURIComponent(input.query);
+          // Use IMSLP's MediaWiki search API
+          const url = `https://imslp.org/api.php?action=query&list=search&srsearch=${query}+piano&srnamespace=0&srlimit=10&format=json&origin=*`;
+          const res = await fetch(url, {
+            headers: { "User-Agent": "PianoMasteryPortal/1.0 (educational tool)" },
+          });
+          if (!res.ok) throw new Error(`IMSLP API error: ${res.status}`);
+          const data = await res.json() as any;
+          const hits: any[] = data?.query?.search ?? [];
+
+          // Filter to piano-relevant results and build structured output
+          const results = hits
+            .filter((h: any) => {
+              const t = (h.title ?? "").toLowerCase();
+              return !t.startsWith("category:") && !t.startsWith("imslp:") && !t.startsWith("template:");
+            })
+            .map((h: any) => {
+              const title: string = h.title ?? "";
+              // Build the IMSLP page URL
+              const pageUrl = `https://imslp.org/wiki/${encodeURIComponent(title.replace(/ /g, "_"))}`;
+              // Strip HTML snippet
+              const snippet = (h.snippet ?? "").replace(/<[^>]+>/g, "").trim();
+              return {
+                title,
+                pageUrl,
+                snippet,
+                wordCount: h.wordcount ?? 0,
+              };
+            });
+
+          return results;
+        } catch (err) {
+          console.error("[SheetMusic] IMSLP search failed:", err);
+          return [];
+        }
+      }),
+  }),
+
   progress: router({
+    /** Summarise progress for ALL of the current user's compositions in one call */
+    summaryAll: protectedProcedure.query(async ({ ctx }) => {
+      const db = await (await import("./db")).getDb();
+      if (!db) return [];
+      const { practiceProgress } = await import("../drizzle/schema");
+      const { eq, and } = await import("drizzle-orm");
+      const rows = await db
+        .select()
+        .from(practiceProgress)
+        .where(eq(practiceProgress.userId, ctx.user.id));
+      // Group by compositionId and count completed days
+      const map: Record<number, { completed: number; total: number }> = {};
+      for (const row of rows) {
+        if (!map[row.compositionId]) map[row.compositionId] = { completed: 0, total: 0 };
+        map[row.compositionId].total += 1;
+        if (row.completed) map[row.compositionId].completed += 1;
+      }
+      return Object.entries(map).map(([id, counts]) => ({
+        compositionId: Number(id),
+        completedDays: counts.completed,
+        totalDays: 30,
+        percentage: Math.round((counts.completed / 30) * 100),
+      }));
+    }),
+
     /** Get all progress records for a composition, scoped to the current user */
     get: protectedProcedure
       .input(z.object({ compositionId: z.number() }))
