@@ -8,8 +8,11 @@ import { useParams, useLocation } from "wouter";
 import { trpc } from "@/lib/trpc";
 import {
   ChevronDown, ChevronUp, ChevronLeft, Music, BookOpen, Dumbbell, Calendar,
-  Info, CheckCircle2, Circle, RotateCcw, Loader2, AlertCircle, Youtube
+  Info, CheckCircle2, Circle, RotateCcw, Loader2, AlertCircle, Youtube, CalendarDays, X
 } from "lucide-react";
+import { Calendar as CalendarPicker } from "@/components/ui/calendar";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { format, addDays } from "date-fns";
 
 const LOGO_TREBLE = "https://d2xsxph8kpxj0f.cloudfront.net/310519663449376037/iyZgf5CgymBq6EtTfh66yp/logo_treble-Ys7HU4Ydwkc3JS4KPHV5db.webp";
 const HERO_BG = "https://d2xsxph8kpxj0f.cloudfront.net/310519663449376037/iyZgf5CgymBq6EtTfh66yp/hero_bg-DDCWpXMzKGFmMUM3oU8SpS.webp";
@@ -134,6 +137,7 @@ const LA_CAMPANELLA_FRAMEWORK = {
 
 // ── localStorage key for La Campanella ───────────────────────────────────────
 const LC_STORAGE_KEY = "la-campanella-progress-v1";
+const LC_START_DATE_KEY = "la-campanella-start-date-v1";
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 function BellOrnament({ label }: { label: string }) {
@@ -173,8 +177,9 @@ function ProgressRing({ done, total }: { done: number; total: number }) {
   );
 }
 
-function DayCard({ day, focus, goal, completed, onToggle }: {
-  day: number; focus: string; goal: string; completed: boolean; onToggle: (day: number) => void;
+function DayCard({ day, focus, goal, completed, onToggle, dateLabel }: {
+  day: number; focus: string; goal: string; completed: boolean;
+  onToggle: (day: number) => void; dateLabel?: string | null;
 }) {
   const [open, setOpen] = useState(false);
   return (
@@ -188,7 +193,12 @@ function DayCard({ day, focus, goal, completed, onToggle }: {
         </button>
         <button onClick={() => setOpen(!open)}
           className="flex-1 flex items-center gap-3 px-3 py-4 text-left hover:bg-[oklch(0.20_0.014_265)] transition-colors">
-          <span className={`font-mono text-xs w-8 shrink-0 ${completed ? "text-[oklch(0.78_0.12_85)]" : "text-[oklch(0.50_0.012_265)]"}`}>D{day}</span>
+          <div className="flex flex-col items-start w-16 shrink-0">
+            <span className={`font-mono text-xs ${completed ? "text-[oklch(0.78_0.12_85)]" : "text-[oklch(0.50_0.012_265)]"}`}>D{day}</span>
+            {dateLabel && (
+              <span className="font-mono text-[0.55rem] text-[oklch(0.45_0.08_85)] leading-none mt-0.5">{dateLabel}</span>
+            )}
+          </div>
           <span className={`text-sm font-semibold flex-1 ${completed ? "text-[oklch(0.60_0.015_265)] line-through" : "text-[oklch(0.88_0.01_85)]"}`}>{focus}</span>
           {completed && <span className="text-[0.6rem] font-mono text-[oklch(0.78_0.12_85)] uppercase tracking-wider shrink-0 mr-1">Done</span>}
           {open ? <ChevronUp size={14} className="text-[oklch(0.58_0.015_265)] shrink-0" /> : <ChevronDown size={14} className="text-[oklch(0.58_0.015_265)] shrink-0" />}
@@ -196,6 +206,11 @@ function DayCard({ day, focus, goal, completed, onToggle }: {
       </div>
       {open && (
         <div className="px-5 pb-4 pt-1 border-t border-[oklch(0.24_0.016_265)] ml-14">
+          {dateLabel && (
+            <p className="text-[0.65rem] font-mono text-[oklch(0.55_0.08_85)] mb-2 flex items-center gap-1.5">
+              <CalendarDays size={10} /> {dateLabel}
+            </p>
+          )}
           <p className="text-sm text-[oklch(0.75_0.01_85)] leading-relaxed">{goal}</p>
           {!completed && (
             <button onClick={() => { onToggle(day); setOpen(false); }}
@@ -229,6 +244,37 @@ export default function CompositionDetail() {
     if (!isBuiltIn) return;
     try { localStorage.setItem(LC_STORAGE_KEY, JSON.stringify(Array.from(localCompleted))); } catch {}
   }, [localCompleted, isBuiltIn]);
+
+  // Start date — stored per composition in localStorage
+  const startDateKey = isBuiltIn
+    ? LC_START_DATE_KEY
+    : `piano-mastery-start-date-${params.id}`;
+
+  const [startDate, setStartDate] = useState<Date | undefined>(() => {
+    try {
+      const raw = localStorage.getItem(startDateKey);
+      if (raw) return new Date(raw);
+    } catch {}
+    return undefined;
+  });
+
+  const [datePickerOpen, setDatePickerOpen] = useState(false);
+
+  useEffect(() => {
+    try {
+      if (startDate) {
+        localStorage.setItem(startDateKey, startDate.toISOString());
+      } else {
+        localStorage.removeItem(startDateKey);
+      }
+    } catch {}
+  }, [startDate, startDateKey]);
+
+  // Helper: given a day number (1–30), return the calendar date string
+  const getDayDate = (dayNumber: number): string | null => {
+    if (!startDate) return null;
+    return format(addDays(startDate, dayNumber - 1), "MMM d");
+  };
 
   // Fetch uploaded composition
   const compositionId = isBuiltIn ? null : parseInt(params.id ?? "0", 10);
@@ -536,10 +582,46 @@ export default function CompositionDetail() {
 
               {/* Progress Dashboard */}
               <div className="nocturne-card p-6 mb-12 border-[oklch(0.78_0.12_85/0.2)]">
-                <div className="flex items-center justify-between mb-5">
+                <div className="flex items-start justify-between mb-5 gap-4 flex-wrap">
                   <div>
                     <p className="font-mono text-[0.6rem] text-[oklch(0.50_0.012_265)] uppercase tracking-widest mb-1">Practice Tracker</p>
                     <h3 className="font-['Playfair_Display'] font-semibold text-xl text-[oklch(0.88_0.01_85)]">Your 30-Day Progress</h3>
+                    {/* Start-date picker */}
+                    <div className="mt-3 flex items-center gap-2">
+                      <Popover open={datePickerOpen} onOpenChange={setDatePickerOpen}>
+                        <PopoverTrigger asChild>
+                          <button className="inline-flex items-center gap-2 px-3 py-1.5 rounded-md text-xs font-mono
+                            bg-[oklch(0.18_0.016_265)] border border-[oklch(0.28_0.018_265)]
+                            text-[oklch(0.65_0.015_265)] hover:border-[oklch(0.78_0.12_85/0.5)]
+                            hover:text-[oklch(0.78_0.12_85)] transition-all duration-150">
+                            <CalendarDays size={12} />
+                            {startDate ? `Day 1: ${format(startDate, "MMM d, yyyy")}` : "Set start date"}
+                          </button>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-auto p-0 bg-[oklch(0.14_0.018_265)] border border-[oklch(0.28_0.018_265)] shadow-2xl" align="start">
+                          <CalendarPicker
+                            mode="single"
+                            selected={startDate}
+                            onSelect={(date) => { setStartDate(date); setDatePickerOpen(false); }}
+                            initialFocus
+                          />
+                        </PopoverContent>
+                      </Popover>
+                      {startDate && (
+                        <button
+                          onClick={() => setStartDate(undefined)}
+                          title="Clear start date"
+                          className="p-1 rounded text-[oklch(0.40_0.012_265)] hover:text-red-400 transition-colors"
+                        >
+                          <X size={12} />
+                        </button>
+                      )}
+                    </div>
+                    {startDate && (
+                      <p className="mt-1.5 text-[0.6rem] font-mono text-[oklch(0.45_0.08_85)]">
+                        Ends {format(addDays(startDate, 29), "MMM d, yyyy")}
+                      </p>
+                    )}
                   </div>
                   <div className="text-right">
                     <p className="font-mono text-3xl font-bold text-[oklch(0.78_0.12_85)]">{overallPct}%</p>
@@ -660,7 +742,8 @@ export default function CompositionDetail() {
                     <div className="grid gap-2">
                       {week.days.map((d: any) => (
                         <DayCard key={d.day} day={d.day} focus={d.focus} goal={d.goal}
-                          completed={completed.has(d.day)} onToggle={toggleDay} />
+                          completed={completed.has(d.day)} onToggle={toggleDay}
+                          dateLabel={getDayDate(d.day)} />
                       ))}
                     </div>
                   </div>
