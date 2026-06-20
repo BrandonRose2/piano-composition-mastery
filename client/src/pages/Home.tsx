@@ -8,11 +8,45 @@ import { useState, useCallback, useRef, useEffect } from "react";
 import { useLocation } from "wouter";
 import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
-import { Music, Upload, BookOpen, ChevronRight, Loader2, AlertCircle, CheckCircle2, Clock, Trash2, Youtube, ExternalLink } from "lucide-react";
+import { Music, Upload, BookOpen, ChevronRight, Loader2, AlertCircle, CheckCircle2, Clock, Trash2, Youtube, ExternalLink, LogOut, User } from "lucide-react";
+import { useAuth } from "@/_core/hooks/useAuth";
 
 // ── Asset URLs ────────────────────────────────────────────────────────────────
 const HERO_BG = "https://d2xsxph8kpxj0f.cloudfront.net/310519663449376037/iyZgf5CgymBq6EtTfh66yp/hero_bg-DDCWpXMzKGFmMUM3oU8SpS.webp";
 const LOGO_TREBLE = "https://d2xsxph8kpxj0f.cloudfront.net/310519663449376037/iyZgf5CgymBq6EtTfh66yp/logo_treble-Ys7HU4Ydwkc3JS4KPHV5db.webp";
+
+// ── Nav Bar ──────────────────────────────────────────────────────────────────
+function NavBar() {
+  const { user, logout } = useAuth();
+  return (
+    <nav className="flex items-center justify-between mb-16">
+      <div className="flex items-center gap-3">
+        <img src={LOGO_TREBLE} alt="Treble clef" className="h-9 w-auto" />
+        <span className="font-['Playfair_Display'] font-semibold text-[oklch(0.78_0.12_85)] text-sm tracking-wide">
+          Piano Mastery Portal
+        </span>
+      </div>
+      {user && (
+        <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2 text-xs font-mono text-[oklch(0.50_0.012_265)]">
+            <User size={12} className="text-[oklch(0.78_0.12_85)]" />
+            <span className="hidden sm:inline">{user.name ?? user.email ?? "Pianist"}</span>
+          </div>
+          <button
+            onClick={() => logout()}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-mono
+              text-[oklch(0.45_0.012_265)] border border-[oklch(0.22_0.016_265)]
+              hover:text-[oklch(0.70_0.012_265)] hover:border-[oklch(0.35_0.016_265)]
+              transition-all duration-150 active:scale-95"
+            title="Sign out"
+          >
+            <LogOut size={11} /> Sign out
+          </button>
+        </div>
+      )}
+    </nav>
+  );
+}
 
 // ── PDF text extraction (client-side, best-effort) ───────────────────────────
 async function extractTextFromFile(file: File): Promise<string> {
@@ -374,12 +408,7 @@ export default function Home() {
 
         <div className="relative z-10 max-w-5xl mx-auto px-6 py-16 sm:py-24">
           {/* Nav */}
-          <nav className="flex items-center gap-3 mb-16">
-            <img src={LOGO_TREBLE} alt="Treble clef" className="h-9 w-auto" />
-            <span className="font-['Playfair_Display'] font-semibold text-[oklch(0.78_0.12_85)] text-sm tracking-wide">
-              Piano Mastery Portal
-            </span>
-          </nav>
+          <NavBar />
 
           {/* Hero text */}
           <div className="max-w-3xl">

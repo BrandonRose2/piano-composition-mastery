@@ -30,6 +30,8 @@ export type InsertUser = typeof users.$inferInsert;
  */
 export const compositions = mysqlTable("compositions", {
   id: int("id").autoincrement().primaryKey(),
+  /** Owner of this composition — null means public/legacy */
+  userId: int("userId"),
   title: varchar("title", { length: 512 }).notNull(),
   composer: varchar("composer", { length: 256 }),
   fileKey: varchar("fileKey", { length: 512 }),
@@ -54,6 +56,8 @@ export type InsertComposition = typeof compositions.$inferInsert;
  */
 export const practiceProgress = mysqlTable("practice_progress", {
   id: int("id").autoincrement().primaryKey(),
+  /** Owner of this progress record */
+  userId: int("userId"),
   compositionId: int("compositionId").notNull(),
   dayNumber: int("dayNumber").notNull(),
   completed: int("completed").default(0).notNull(),

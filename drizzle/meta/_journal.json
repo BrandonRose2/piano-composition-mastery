@@ -8,6 +8,13 @@
       "when": 1781893950900,
       "tag": "0000_rare_vargas",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "5",
+      "when": 1781995361842,
+      "tag": "0001_furry_old_lace",
+      "breakpoints": true
     }
   ]
 }

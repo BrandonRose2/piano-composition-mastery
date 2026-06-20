@@ -2,7 +2,7 @@ import { z } from "zod";
 import { COOKIE_NAME } from "@shared/const";
 import { getSessionCookieOptions } from "./_core/cookies";
 import { systemRouter } from "./_core/systemRouter";
-import { publicProcedure, router } from "./_core/trpc";
+import { publicProcedure, protectedProcedure, router } from "./_core/trpc";
 import {
   createComposition,
   getCompositionById,
@@ -14,6 +14,7 @@ import {
 } from "./db";
 import { storagePut } from "./storage";
 import { analyzeComposition } from "./analyzeComposition";
+import { callDataApi } from "./_core/dataApi";
 
 export const appRouter = router({
   system: systemRouter,
@@ -27,17 +28,20 @@ export const appRouter = router({
   }),
 
   compositions: router({
-    list: publicProcedure.query(async () => {
-      return listCompositions();
+    /** List only the current user's compositions */
+    list: protectedProcedure.query(async ({ ctx }) => {
+      return listCompositions(ctx.user.id);
     }),
 
-    get: publicProcedure
+    /** Get a single composition — only if it belongs to the current user */
+    get: protectedProcedure
       .input(z.object({ id: z.number() }))
-      .query(async ({ input }) => {
-        return getCompositionById(input.id);
+      .query(async ({ input, ctx }) => {
+        return getCompositionById(input.id, ctx.user.id);
       }),
 
-    upload: publicProcedure
+    /** Upload a new composition score and kick off AI analysis */
+    upload: protectedProcedure
       .input(
         z.object({
           fileName: z.string(),
@@ -46,12 +50,14 @@ export const appRouter = router({
           extractedText: z.string().optional().default(""),
         })
       )
-      .mutation(async ({ input }) => {
+      .mutation(async ({ input, ctx }) => {
+        const userId = ctx.user.id;
         const buffer = Buffer.from(input.base64Data, "base64");
-        const key = `compositions/${Date.now()}-${input.fileName.replace(/[^a-zA-Z0-9._-]/g, "_")}`;
+        const key = `compositions/${userId}/${Date.now()}-${input.fileName.replace(/[^a-zA-Z0-9._-]/g, "_")}`;
         const { url: fileUrl } = await storagePut(key, buffer, input.mimeType);
 
         const composition = await createComposition({
+          userId,
           title: input.fileName.replace(/\.[^.]+$/, "").replace(/[-_]/g, " "),
           fileName: input.fileName,
           fileKey: key,
@@ -65,10 +71,8 @@ export const appRouter = router({
         const compositionId = composition.id;
         const fileName = input.fileName;
         const mimeType = input.mimeType;
-        // Keep the buffer in closure for server-side PDF text extraction
         const fileBuffer = buffer;
 
-        // Use setTimeout(0) instead of setImmediate for broader runtime compatibility
         setTimeout(async () => {
           try {
             console.log(`[Analysis] Starting analysis for composition ${compositionId}: ${fileName}`);
@@ -92,30 +96,84 @@ export const appRouter = router({
         return composition;
       }),
 
-    status: publicProcedure
+    /** Poll the status of an in-progress composition */
+    status: protectedProcedure
       .input(z.object({ id: z.number() }))
-      .query(async ({ input }) => {
-        const comp = await getCompositionById(input.id);
+      .query(async ({ input, ctx }) => {
+        const comp = await getCompositionById(input.id, ctx.user.id);
         if (!comp) throw new Error("Composition not found");
         return { status: comp.status, errorMessage: comp.errorMessage };
       }),
 
-    delete: publicProcedure
+    /** Delete a composition and all its progress records */
+    delete: protectedProcedure
       .input(z.object({ id: z.number() }))
-      .mutation(async ({ input }) => {
-        await deleteComposition(input.id);
+      .mutation(async ({ input, ctx }) => {
+        await deleteComposition(input.id, ctx.user.id);
         return { success: true };
       }),
   }),
 
-  progress: router({
-    get: publicProcedure
-      .input(z.object({ compositionId: z.number() }))
+  youtube: router({
+    /** Search YouTube for the best performance video of a given piece */
+    searchPerformance: publicProcedure
+      .input(z.object({ title: z.string(), composer: z.string() }))
       .query(async ({ input }) => {
-        return getProgressForComposition(input.compositionId);
+        const query = `${input.composer} ${input.title} piano performance`;
+        try {
+          const result = await callDataApi("Youtube/search", {
+            query: { q: query, gl: "US", hl: "en" },
+          }) as any;
+
+          const contents: any[] = result?.contents ?? [];
+
+          const videos = contents
+            .filter((c: any) => c?.type === "video" && c?.video?.videoId)
+            .map((c: any) => ({
+              videoId: c.video.videoId as string,
+              title: (c.video.title ?? "") as string,
+              channelTitle: (c.video.channelTitle ?? "") as string,
+              viewCountText: (c.video.viewCountText ?? "") as string,
+              lengthText: (c.video.lengthText ?? "") as string,
+              publishedTimeText: (c.video.publishedTimeText ?? "") as string,
+              thumbnailUrl: (c.video.thumbnails?.[0]?.url ?? "") as string,
+            }));
+
+          if (videos.length === 0) return null;
+
+          const parseViews = (text: string): number => {
+            if (!text) return 0;
+            const clean = text.replace(/[^0-9.KMB]/gi, "");
+            const num = parseFloat(clean);
+            if (isNaN(num)) return 0;
+            if (/B/i.test(text)) return num * 1_000_000_000;
+            if (/M/i.test(text)) return num * 1_000_000;
+            if (/K/i.test(text)) return num * 1_000;
+            return num;
+          };
+
+          const sorted = [...videos].sort(
+            (a, b) => parseViews(b.viewCountText) - parseViews(a.viewCountText)
+          );
+
+          return sorted[0] ?? null;
+        } catch (err) {
+          console.error("[YouTube] Search failed:", err);
+          return null;
+        }
+      }),
+  }),
+
+  progress: router({
+    /** Get all progress records for a composition, scoped to the current user */
+    get: protectedProcedure
+      .input(z.object({ compositionId: z.number() }))
+      .query(async ({ input, ctx }) => {
+        return getProgressForComposition(input.compositionId, ctx.user.id);
       }),
 
-    toggle: publicProcedure
+    /** Toggle a day's completion status */
+    toggle: protectedProcedure
       .input(
         z.object({
           compositionId: z.number(),
@@ -124,8 +182,14 @@ export const appRouter = router({
           notes: z.string().optional(),
         })
       )
-      .mutation(async ({ input }) => {
-        await toggleDayProgress(input.compositionId, input.dayNumber, input.completed, input.notes);
+      .mutation(async ({ input, ctx }) => {
+        await toggleDayProgress(
+          input.compositionId,
+          input.dayNumber,
+          input.completed,
+          ctx.user.id,
+          input.notes
+        );
         return { success: true };
       }),
   }),

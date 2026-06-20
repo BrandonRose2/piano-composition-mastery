@@ -89,7 +89,7 @@ export async function getUserByOpenId(openId: string) {
   return result.length > 0 ? result[0] : undefined;
 }
 
-// ── Composition helpers ────────────────────────────────────────────────────
+// ── Composition helpers (userId-scoped) ───────────────────────────────────────
 
 export async function createComposition(data: InsertComposition) {
   const db = await getDb();
@@ -101,17 +101,24 @@ export async function createComposition(data: InsertComposition) {
   return rows[0];
 }
 
-export async function getCompositionById(id: number) {
+export async function getCompositionById(id: number, userId?: number) {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
-  const rows = await db.select().from(compositions).where(eq(compositions.id, id)).limit(1);
+  const where = userId !== undefined
+    ? and(eq(compositions.id, id), eq(compositions.userId, userId))
+    : eq(compositions.id, id);
+  const rows = await db.select().from(compositions).where(where).limit(1);
   return rows[0] ?? null;
 }
 
-export async function listCompositions() {
+export async function listCompositions(userId: number) {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
-  return db.select().from(compositions).orderBy(desc(compositions.createdAt));
+  return db
+    .select()
+    .from(compositions)
+    .where(eq(compositions.userId, userId))
+    .orderBy(desc(compositions.createdAt));
 }
 
 export async function updateCompositionStatus(
@@ -128,29 +135,46 @@ export async function updateCompositionStatus(
   await db.update(compositions).set(set).where(eq(compositions.id, id));
 }
 
-export async function deleteComposition(id: number) {
+export async function deleteComposition(id: number, userId: number) {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
-  // Delete associated progress records first (cascade)
+  // Only delete if the composition belongs to this user
+  const comp = await getCompositionById(id, userId);
+  if (!comp) throw new Error("Composition not found or access denied");
   await db.delete(practiceProgress).where(eq(practiceProgress.compositionId, id));
   await db.delete(compositions).where(eq(compositions.id, id));
 }
 
-// ── Progress helpers ───────────────────────────────────────────────────────
+// ── Progress helpers (userId-scoped) ──────────────────────────────────────────
 
-export async function getProgressForComposition(compositionId: number) {
+export async function getProgressForComposition(compositionId: number, userId: number) {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
-  return db.select().from(practiceProgress).where(eq(practiceProgress.compositionId, compositionId));
+  return db
+    .select()
+    .from(practiceProgress)
+    .where(and(eq(practiceProgress.compositionId, compositionId), eq(practiceProgress.userId, userId)));
 }
 
-export async function toggleDayProgress(compositionId: number, dayNumber: number, completed: boolean, notes?: string) {
+export async function toggleDayProgress(
+  compositionId: number,
+  dayNumber: number,
+  completed: boolean,
+  userId: number,
+  notes?: string
+) {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
   const existing = await db
     .select()
     .from(practiceProgress)
-    .where(and(eq(practiceProgress.compositionId, compositionId), eq(practiceProgress.dayNumber, dayNumber)))
+    .where(
+      and(
+        eq(practiceProgress.compositionId, compositionId),
+        eq(practiceProgress.dayNumber, dayNumber),
+        eq(practiceProgress.userId, userId)
+      )
+    )
     .limit(1);
 
   if (existing.length > 0) {
@@ -161,11 +185,18 @@ export async function toggleDayProgress(compositionId: number, dayNumber: number
         completedAt: completed ? new Date() : null,
         notes: notes ?? existing[0].notes,
       })
-      .where(and(eq(practiceProgress.compositionId, compositionId), eq(practiceProgress.dayNumber, dayNumber)));
+      .where(
+        and(
+          eq(practiceProgress.compositionId, compositionId),
+          eq(practiceProgress.dayNumber, dayNumber),
+          eq(practiceProgress.userId, userId)
+        )
+      );
   } else {
     await db.insert(practiceProgress).values({
       compositionId,
       dayNumber,
+      userId,
       completed: completed ? 1 : 0,
       completedAt: completed ? new Date() : null,
       notes: notes ?? null,

@@ -9,7 +9,7 @@ import { trpc } from "@/lib/trpc";
 import {
   ChevronDown, ChevronUp, ChevronLeft, Music, BookOpen, Dumbbell, Calendar,
   Info, CheckCircle2, Circle, RotateCcw, Loader2, AlertCircle, Youtube, CalendarDays, X, FileMusic,
-  Columns2, PanelLeftClose
+  Columns2, PanelLeftClose, Play, Eye, Clock, User
 } from "lucide-react";
 import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from "@/components/ui/resizable";
 import { Calendar as CalendarPicker } from "@/components/ui/calendar";
@@ -175,6 +175,97 @@ function ProgressRing({ done, total }: { done: number; total: number }) {
       <div className="absolute inset-0 flex flex-col items-center justify-center">
         <span className="font-mono text-2xl font-bold text-[oklch(0.78_0.12_85)]">{done}</span>
         <span className="font-mono text-[0.6rem] text-[oklch(0.50_0.012_265)] uppercase tracking-widest">of {total}</span>
+      </div>
+    </div>
+  );
+}
+
+// ── Performance Video Section ────────────────────────────────────────────────
+function PerformanceVideoSection({ title, composer }: { title: string; composer: string }) {
+  const [playing, setPlaying] = useState(false);
+
+  const { data: video, isLoading, error } = trpc.youtube.searchPerformance.useQuery(
+    { title, composer },
+    { staleTime: 1000 * 60 * 60, retry: 1 }
+  );
+
+  if (isLoading) {
+    return (
+      <div className="nocturne-card p-8 flex items-center gap-4">
+        <Loader2 size={20} className="animate-spin text-[oklch(0.78_0.12_85)]" />
+        <span className="text-sm text-[oklch(0.55_0.015_265)] font-mono">Searching for the best performance...</span>
+      </div>
+    );
+  }
+
+  if (error || !video) {
+    return (
+      <div className="nocturne-card p-8 flex items-center gap-3 text-[oklch(0.50_0.012_265)]">
+        <AlertCircle size={16} />
+        <span className="text-sm font-mono">No performance video found. <a href={`https://www.youtube.com/results?search_query=${encodeURIComponent(composer + " " + title + " piano")}`} target="_blank" rel="noopener noreferrer" className="text-[oklch(0.78_0.12_85)] hover:underline">Search YouTube manually →</a></span>
+      </div>
+    );
+  }
+
+  const embedUrl = `https://www.youtube.com/embed/${video.videoId}?autoplay=1&rel=0&modestbranding=1`;
+  const watchUrl = `https://www.youtube.com/watch?v=${video.videoId}`;
+
+  return (
+    <div className="space-y-4">
+      {/* Video player */}
+      <div className="relative w-full rounded-xl overflow-hidden border border-[oklch(0.24_0.016_265)] bg-[oklch(0.10_0.016_265)]" style={{ aspectRatio: "16/9" }}>
+        {!playing ? (
+          // Thumbnail with play button overlay
+          <>
+            {video.thumbnailUrl && (
+              <img src={video.thumbnailUrl} alt={video.title}
+                className="w-full h-full object-cover opacity-70" />
+            )}
+            <div className="absolute inset-0 flex flex-col items-center justify-center bg-[oklch(0.08_0.016_265/0.6)]">
+              <button
+                onClick={() => setPlaying(true)}
+                className="group flex items-center justify-center w-20 h-20 rounded-full bg-[oklch(0.78_0.12_85/0.15)] border-2 border-[oklch(0.78_0.12_85/0.6)] hover:bg-[oklch(0.78_0.12_85/0.25)] hover:border-[oklch(0.78_0.12_85)] transition-all duration-200 mb-4"
+                aria-label="Play video"
+              >
+                <Play size={32} className="text-[oklch(0.78_0.12_85)] ml-1 group-hover:scale-110 transition-transform" fill="currentColor" />
+              </button>
+              <p className="font-['Playfair_Display'] text-lg text-[oklch(0.88_0.01_85)] text-center px-8 max-w-2xl leading-snug">{video.title}</p>
+              <p className="text-sm text-[oklch(0.55_0.015_265)] mt-1 font-mono">{video.channelTitle}</p>
+            </div>
+          </>
+        ) : (
+          <iframe
+            src={embedUrl}
+            title={video.title}
+            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+            allowFullScreen
+            className="w-full h-full border-0"
+          />
+        )}
+      </div>
+
+      {/* Video metadata card */}
+      <div className="nocturne-card p-4 flex flex-wrap items-start justify-between gap-4">
+        <div className="flex-1 min-w-0">
+          <p className="font-['Playfair_Display'] font-semibold text-[oklch(0.88_0.01_85)] leading-snug mb-1 truncate">{video.title}</p>
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs font-mono text-[oklch(0.50_0.012_265)]">
+            {video.channelTitle && <span className="flex items-center gap-1"><User size={10} />{video.channelTitle}</span>}
+            {video.viewCountText && <span className="flex items-center gap-1"><Eye size={10} />{video.viewCountText} views</span>}
+            {video.lengthText && <span className="flex items-center gap-1"><Clock size={10} />{video.lengthText}</span>}
+            {video.publishedTimeText && <span className="text-[oklch(0.40_0.012_265)]">{video.publishedTimeText}</span>}
+          </div>
+        </div>
+        <a
+          href={watchUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="inline-flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-mono font-medium
+            bg-red-600/15 border border-red-600/30 text-red-400
+            hover:bg-red-600/25 hover:border-red-500/50 hover:text-red-300
+            transition-all duration-150 shrink-0"
+        >
+          <Youtube size={13} /> Watch on YouTube
+        </a>
       </div>
     </div>
   );
@@ -353,6 +444,7 @@ export default function CompositionDetail() {
     { id: "history", label: "Historical Context", icon: BookOpen },
     { id: "technical", label: "Technical Evaluation", icon: Music },
     { id: "hanon", label: "Hanon Exercises", icon: Dumbbell },
+    { id: "performance", label: "Featured Performance", icon: Youtube },
     { id: "framework", label: "30-Day Framework", icon: Calendar },
     { id: "principles", label: "Practice Principles", icon: Info },
   ];
@@ -740,6 +832,20 @@ export default function CompositionDetail() {
                   </tbody>
                 </table>
               </div>
+            </section>
+
+            <GoldRule />
+
+            {/* ── FEATURED PERFORMANCE VIDEO ─────────────────────────────── */}
+            <section id="performance">
+              <BellOrnament label="Part IV" />
+              <h2 className="font-['Playfair_Display'] font-bold text-4xl sm:text-5xl text-[oklch(0.92_0.01_85)] mb-4">Featured Performance</h2>
+              <p className="text-[oklch(0.65_0.015_265)] leading-relaxed mb-10 max-w-2xl">
+                Watch the most-viewed professional recording of this piece on YouTube. Studying a master performance
+                is an essential part of learning — absorb the phrasing, dynamics, and musical character before
+                your fingers learn the notes.
+              </p>
+              <PerformanceVideoSection title={analysis.title} composer={analysis.composer} />
             </section>
 
             <GoldRule />
