@@ -8,8 +8,10 @@ import { useParams, useLocation } from "wouter";
 import { trpc } from "@/lib/trpc";
 import {
   ChevronDown, ChevronUp, ChevronLeft, Music, BookOpen, Dumbbell, Calendar,
-  Info, CheckCircle2, Circle, RotateCcw, Loader2, AlertCircle, Youtube, CalendarDays, X, FileMusic
+  Info, CheckCircle2, Circle, RotateCcw, Loader2, AlertCircle, Youtube, CalendarDays, X, FileMusic,
+  Columns2, PanelLeftClose
 } from "lucide-react";
+import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from "@/components/ui/resizable";
 import { Calendar as CalendarPicker } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { format, addDays } from "date-fns";
@@ -260,6 +262,7 @@ export default function CompositionDetail() {
   });
 
   const [datePickerOpen, setDatePickerOpen] = useState(false);
+  const [splitScreen, setSplitScreen] = useState(false);
 
   useEffect(() => {
     try {
@@ -436,16 +439,155 @@ export default function CompositionDetail() {
             {analysis.title}
           </h1>
           <p className="text-[oklch(0.65_0.015_265)] text-lg max-w-2xl leading-relaxed">{analysis.overview}</p>
-          <div className="flex flex-wrap gap-3 mt-6">
+          <div className="flex flex-wrap items-center gap-3 mt-6">
             {[analysis.difficulty, analysis.key, analysis.estimatedDuration].filter(Boolean).map((tag: string) => (
               <span key={tag} className="text-xs font-mono text-[oklch(0.60_0.012_265)] border border-[oklch(0.28_0.018_265)] rounded-full px-3 py-1">{tag}</span>
             ))}
+            {hasScore && (
+              <button
+                onClick={() => setSplitScreen(s => !s)}
+                title={splitScreen ? "Exit split-screen" : "Split-screen: Score + Tracker"}
+                className={`ml-auto flex items-center gap-2 px-4 py-1.5 rounded-full text-xs font-mono border transition-all duration-200 ${
+                  splitScreen
+                    ? "bg-[oklch(0.78_0.12_85/0.15)] border-[oklch(0.78_0.12_85/0.6)] text-[oklch(0.78_0.12_85)]"
+                    : "border-[oklch(0.30_0.018_265)] text-[oklch(0.55_0.015_265)] hover:border-[oklch(0.78_0.12_85/0.5)] hover:text-[oklch(0.78_0.12_85)]"
+                }`}
+              >
+                {splitScreen ? <PanelLeftClose size={13} /> : <Columns2 size={13} />}
+                {splitScreen ? "Exit Split" : "Split Screen"}
+              </button>
+            )}
           </div>
         </div>
       </header>
 
-      {/* ── LAYOUT ────────────────────────────────────────────────────────── */}
-      <div className="flex">
+      {/* ── SPLIT-SCREEN MODE ─────────────────────────────────────────────── */}
+      {splitScreen && hasScore && composition?.fileUrl && (
+        <div className="fixed inset-0 top-0 z-50 bg-[oklch(0.10_0.016_265)] flex flex-col" style={{ paddingTop: 0 }}>
+          {/* Split-screen top bar */}
+          <div className="flex items-center justify-between px-4 py-2 border-b border-[oklch(0.22_0.016_265)] bg-[oklch(0.13_0.018_265)] shrink-0">
+            <div className="flex items-center gap-3">
+              <img src={LOGO_TREBLE} alt="" className="h-5 w-auto" />
+              <span className="font-['Playfair_Display'] text-sm text-[oklch(0.78_0.12_85)]">{analysis.title}</span>
+              <span className="text-[oklch(0.35_0.014_265)] text-xs font-mono">·</span>
+              <span className="text-[oklch(0.50_0.012_265)] text-xs font-mono">Split Practice Mode</span>
+            </div>
+            <div className="flex items-center gap-3">
+              <span className="font-mono text-xs text-[oklch(0.78_0.12_85)]">{overallPct}% complete</span>
+              <button
+                onClick={() => setSplitScreen(false)}
+                className="flex items-center gap-2 px-3 py-1.5 rounded text-xs font-mono border border-[oklch(0.30_0.018_265)] text-[oklch(0.55_0.015_265)] hover:border-[oklch(0.78_0.12_85/0.5)] hover:text-[oklch(0.78_0.12_85)] transition-all"
+              >
+                <PanelLeftClose size={12} /> Exit Split
+              </button>
+            </div>
+          </div>
+
+          {/* Resizable panels */}
+          <ResizablePanelGroup direction="horizontal" className="flex-1 min-h-0">
+            {/* Left: Score */}
+            <ResizablePanel defaultSize={55} minSize={30}>
+              <div className="h-full overflow-auto bg-[oklch(0.11_0.016_265)]">
+                <ScoreViewer
+                  fileUrl={composition.fileUrl}
+                  mimeType={composition.mimeType ?? "application/pdf"}
+                  title={analysis?.title ?? composition.title}
+                />
+              </div>
+            </ResizablePanel>
+
+            {/* Divider */}
+            <ResizableHandle
+              withHandle
+              className="w-1.5 bg-[oklch(0.20_0.016_265)] hover:bg-[oklch(0.78_0.12_85/0.3)] transition-colors data-[resize-handle-active]:bg-[oklch(0.78_0.12_85/0.5)]"
+            />
+
+            {/* Right: Tracker */}
+            <ResizablePanel defaultSize={45} minSize={28}>
+              <div className="h-full overflow-y-auto bg-[oklch(0.12_0.018_265)] px-5 py-6">
+                {/* Mini header */}
+                <div className="flex items-center justify-between mb-5">
+                  <div>
+                    <p className="font-mono text-[0.6rem] text-[oklch(0.50_0.012_265)] uppercase tracking-widest mb-0.5">Practice Tracker</p>
+                    <h3 className="font-['Playfair_Display'] font-semibold text-lg text-[oklch(0.88_0.01_85)]">30-Day Plan</h3>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <ProgressRing done={totalDone} total={totalDays} />
+                  </div>
+                </div>
+
+                {/* Overall progress bar */}
+                <div className="w-full h-2 rounded-full bg-[oklch(0.22_0.014_265)] overflow-hidden mb-4">
+                  <div className="h-full rounded-full transition-all duration-700"
+                    style={{ width: `${overallPct}%`, background: "linear-gradient(to right, oklch(0.60 0.08 85), oklch(0.78 0.12 85))" }} />
+                </div>
+
+                {/* Day grid */}
+                <div className="grid grid-cols-10 gap-1 mb-5">
+                  {allDays.map((day: number) => {
+                    const done = completed.has(day);
+                    const weekIdx = (framework.weeks ?? []).findIndex((w: any) => w.days.some((d: any) => d.day === day));
+                    const weekColors = ["oklch(0.78 0.12 85)", "oklch(0.70 0.10 85)", "oklch(0.62 0.09 85)", "oklch(0.55 0.08 85)"];
+                    return (
+                      <button key={day} onClick={() => toggleDay(day)} title={`Day ${day}`}
+                        className={`aspect-square rounded flex items-center justify-center text-[0.5rem] font-mono font-bold transition-all hover:scale-110 active:scale-95 ${
+                          done ? "text-[oklch(0.12_0.018_265)]" : "text-[oklch(0.40_0.012_265)] border border-[oklch(0.24_0.016_265)] hover:border-[oklch(0.50_0.06_85)]"
+                        }`}
+                        style={done ? { background: weekColors[weekIdx] ?? weekColors[0] } : {}}>
+                        {day}
+                      </button>
+                    );
+                  })}
+                </div>
+
+                {/* Start date */}
+                <div className="flex items-center gap-2 mb-5">
+                  <Popover open={datePickerOpen} onOpenChange={setDatePickerOpen}>
+                    <PopoverTrigger asChild>
+                      <button className="inline-flex items-center gap-2 px-3 py-1.5 rounded-md text-xs font-mono bg-[oklch(0.18_0.016_265)] border border-[oklch(0.28_0.018_265)] text-[oklch(0.65_0.015_265)] hover:border-[oklch(0.78_0.12_85/0.5)] hover:text-[oklch(0.78_0.12_85)] transition-all">
+                        <CalendarDays size={11} />
+                        {startDate ? `Day 1: ${format(startDate, "MMM d, yyyy")}` : "Set start date"}
+                      </button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0 bg-[oklch(0.14_0.018_265)] border border-[oklch(0.28_0.018_265)] shadow-2xl z-[60]" align="start">
+                      <CalendarPicker mode="single" selected={startDate} onSelect={(date) => { setStartDate(date); setDatePickerOpen(false); }} initialFocus />
+                    </PopoverContent>
+                  </Popover>
+                  {startDate && (
+                    <button onClick={() => setStartDate(undefined)} className="p-1 rounded text-[oklch(0.40_0.012_265)] hover:text-red-400 transition-colors">
+                      <X size={11} />
+                    </button>
+                  )}
+                </div>
+
+                {/* Week bands + DayCards */}
+                {(framework.weeks ?? []).map((week: any, wi: number) => {
+                  const colorL = 0.78 - wi * 0.08;
+                  return (
+                    <div key={week.week} className="mb-6">
+                      <div className="flex items-center gap-2 mb-2">
+                        <div className="w-1.5 h-4 rounded-full" style={{ background: `oklch(${colorL} 0.10 85)` }} />
+                        <span className="font-mono text-[0.6rem] text-[oklch(0.78_0.12_85)] uppercase tracking-widest">Week {week.week}</span>
+                        <span className="font-mono text-[0.6rem] text-[oklch(0.45_0.012_265)]">{week.title}</span>
+                      </div>
+                      <div className="grid gap-1.5">
+                        {week.days.map((d: any) => (
+                          <DayCard key={d.day} day={d.day} focus={d.focus} goal={d.goal}
+                            completed={completed.has(d.day)} onToggle={toggleDay}
+                            dateLabel={getDayDate(d.day)} />
+                        ))}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </ResizablePanel>
+          </ResizablePanelGroup>
+        </div>
+      )}
+
+      {/* ── NORMAL LAYOUT ─────────────────────────────────────────────────── */}
+      <div className={splitScreen ? "hidden" : "flex"}>
         {/* Sidebar */}
         <aside className="hidden lg:flex flex-col w-64 shrink-0 sticky top-0 h-screen overflow-y-auto border-r border-[oklch(0.24_0.016_265)] bg-[oklch(0.14_0.018_265)] py-10 px-6">
           <div className="flex items-center gap-2 mb-10">
