@@ -16,10 +16,80 @@ const HERO_BG = "https://d2xsxph8kpxj0f.cloudfront.net/310519663449376037/iyZgf5
 const LOGO_TREBLE = "https://d2xsxph8kpxj0f.cloudfront.net/310519663449376037/iyZgf5CgymBq6EtTfh66yp/logo_treble-Ys7HU4Ydwkc3JS4KPHV5db.webp";
 
 // ── Sheet Music Search ───────────────────────────────────────────────────
+// Platform definitions for streaming links
+const STREAMING_PLATFORMS = [
+  {
+    name: "Spotify",
+    color: "#1DB954",
+    bg: "oklch(0.42_0.14_145/0.15)",
+    border: "oklch(0.42_0.14_145/0.35)",
+    textColor: "oklch(0.72_0.14_145)",
+    getUrl: (q: string) => `https://open.spotify.com/search/${encodeURIComponent(q)}`,
+    icon: (
+      <svg viewBox="0 0 24 24" className="w-4 h-4" fill="currentColor">
+        <path d="M12 0C5.4 0 0 5.4 0 12s5.4 12 12 12 12-5.4 12-12S18.66 0 12 0zm5.521 17.34c-.24.359-.66.48-1.021.24-2.82-1.74-6.36-2.101-10.561-1.141-.418.122-.779-.179-.899-.539-.12-.421.18-.78.54-.9 4.56-1.021 8.52-.6 11.64 1.32.42.18.479.659.301 1.02zm1.44-3.3c-.301.42-.841.6-1.262.3-3.239-1.98-8.159-2.58-11.939-1.38-.479.12-1.02-.12-1.14-.6-.12-.48.12-1.021.6-1.141C9.6 9.9 15 10.561 18.72 12.84c.361.181.54.78.241 1.2zm.12-3.36C15.24 8.4 8.82 8.16 5.16 9.301c-.6.179-1.2-.181-1.38-.721-.18-.601.18-1.2.72-1.381 4.26-1.26 11.28-1.02 15.721 1.621.539.3.719 1.02.419 1.56-.299.421-1.02.599-1.559.3z"/>
+      </svg>
+    ),
+  },
+  {
+    name: "Apple Music",
+    color: "#FC3C44",
+    bg: "oklch(0.45_0.20_20/0.15)",
+    border: "oklch(0.45_0.20_20/0.35)",
+    textColor: "oklch(0.72_0.18_20)",
+    getUrl: (q: string) => `https://music.apple.com/search?term=${encodeURIComponent(q)}`,
+    icon: (
+      <svg viewBox="0 0 24 24" className="w-4 h-4" fill="currentColor">
+        <path d="M23.994 6.124a9.23 9.23 0 00-.24-2.19c-.317-1.31-1.062-2.31-2.18-3.043a5.022 5.022 0 00-1.877-.726 10.496 10.496 0 00-1.564-.15c-.04-.003-.083-.01-.124-.013H5.986c-.152.01-.303.017-.455.026C4.786.07 4.043.15 3.34.428 2.004.958 1.04 1.88.475 3.208a5.485 5.485 0 00-.36 1.548c-.06.625-.068 1.252-.078 1.878v9.908c.01.59.013 1.18.06 1.77.124 1.51.73 2.777 1.896 3.758a5.04 5.04 0 002.207.99c.65.12 1.308.148 1.966.15h9.99c.658-.002 1.316-.03 1.966-.15a5.04 5.04 0 002.207-.99c1.166-.98 1.772-2.248 1.896-3.758.047-.59.05-1.18.06-1.77V6.634c0-.17-.003-.34-.008-.51zM12 17.5a5.5 5.5 0 110-11 5.5 5.5 0 010 11zm5.75-9.875a1.375 1.375 0 110-2.75 1.375 1.375 0 010 2.75zM12 8a4 4 0 100 8 4 4 0 000-8z"/>
+      </svg>
+    ),
+  },
+  {
+    name: "YouTube Music",
+    color: "#FF0000",
+    bg: "oklch(0.45_0.22_25/0.15)",
+    border: "oklch(0.45_0.22_25/0.35)",
+    textColor: "oklch(0.68_0.20_25)",
+    getUrl: (q: string) => `https://music.youtube.com/search?q=${encodeURIComponent(q)}`,
+    icon: (
+      <svg viewBox="0 0 24 24" className="w-4 h-4" fill="currentColor">
+        <path d="M12 0C5.376 0 0 5.376 0 12s5.376 12 12 12 12-5.376 12-12S18.624 0 12 0zm0 19.104c-3.924 0-7.104-3.18-7.104-7.104S8.076 4.896 12 4.896s7.104 3.18 7.104 7.104-3.18 7.104-7.104 7.104zm0-13.332c-3.432 0-6.228 2.796-6.228 6.228S8.568 18.228 12 18.228s6.228-2.796 6.228-6.228S15.432 5.772 12 5.772zM9.684 15.54V8.46L15.816 12l-6.132 3.54z"/>
+      </svg>
+    ),
+  },
+  {
+    name: "SoundCloud",
+    color: "#FF5500",
+    bg: "oklch(0.48_0.18_40/0.15)",
+    border: "oklch(0.48_0.18_40/0.35)",
+    textColor: "oklch(0.72_0.16_40)",
+    getUrl: (q: string) => `https://soundcloud.com/search?q=${encodeURIComponent(q)}`,
+    icon: (
+      <svg viewBox="0 0 24 24" className="w-4 h-4" fill="currentColor">
+        <path d="M1.175 12.225c-.015.065-.025.13-.025.2s.01.135.025.2l.65 4.125-.65 4.125c-.015.065-.025.13-.025.2s.01.135.025.2c.075.35.375.6.75.6s.675-.25.75-.6l.75-4.525-.75-4.525c-.075-.35-.375-.6-.75-.6s-.675.25-.75.6zm3.025-.35c-.025.075-.025.15-.025.225s0 .15.025.225l.525 4.25-.525 4.25c-.025.075-.025.15-.025.225s0 .15.025.225c.075.375.4.65.8.65s.725-.275.8-.65l.6-4.7-.6-4.7c-.075-.375-.4-.65-.8-.65s-.725.275-.8.65zm3.1-.525c-.025.075-.025.15-.025.225s0 .15.025.225l.45 4.775-.45 4.775c-.025.075-.025.15-.025.225s0 .15.025.225c.075.4.425.7.85.7s.775-.3.85-.7l.525-5-.525-5c-.075-.4-.425-.7-.85-.7s-.775.3-.85.7zm3.15-.5c-.025.075-.025.15-.025.225s0 .15.025.225l.375 5.275-.375 5.275c-.025.075-.025.15-.025.225s0 .15.025.225c.075.425.45.75.9.75s.825-.325.9-.75l.425-5.5-.425-5.5c-.075-.425-.45-.75-.9-.75s-.825.325-.9.75zM18 7.5c-.55 0-1.075.1-1.575.275C16.15 5.1 13.85 3 11.1 3c-.7 0-1.375.15-1.975.4-.225.1-.275.225-.275.35v13.5c0 .15.1.275.25.3H18c1.65 0 3-1.35 3-3s-1.35-3-3-3z"/>
+      </svg>
+    ),
+  },
+  {
+    name: "Tidal",
+    color: "#00FFFF",
+    bg: "oklch(0.75_0.10_195/0.10)",
+    border: "oklch(0.75_0.10_195/0.25)",
+    textColor: "oklch(0.72_0.08_195)",
+    getUrl: (q: string) => `https://tidal.com/search?q=${encodeURIComponent(q)}`,
+    icon: (
+      <svg viewBox="0 0 24 24" className="w-4 h-4" fill="currentColor">
+        <path d="M12.012 3.992L8.008 7.996 4.004 3.992 0 7.996l4.004 4.004 4.004-4.004 4.004 4.004 4.004-4.004zM8.008 16.004l4.004-4.004 4.004 4.004L20.02 12l-4.004-4.004-4.004 4.004L8.008 7.996 4.004 12z"/>
+      </svg>
+    ),
+  },
+];
+
 function SheetMusicSearch() {
   const [query, setQuery] = useState("");
   const [submitted, setSubmitted] = useState("");
   const [open, setOpen] = useState(false);
+  const [activeTab, setActiveTab] = useState<"scores" | "streaming">("scores");
 
   const { data: results = [], isFetching } = trpc.sheetMusic.search.useQuery(
     { query: submitted },
@@ -46,7 +116,7 @@ function SheetMusicSearch() {
       <div className="flex items-center gap-3 mb-6">
         <span className="text-[oklch(0.78_0.12_85)]">♪</span>
         <div className="flex-1 h-px bg-gradient-to-r from-[oklch(0.78_0.12_85/0.4)] to-transparent" />
-        <p className="font-mono text-[0.6rem] text-[oklch(0.78_0.12_85)] uppercase tracking-[0.25em]">Find Sheet Music</p>
+        <p className="font-mono text-[0.6rem] text-[oklch(0.78_0.12_85)] uppercase tracking-[0.25em]">Find Music & Sheet Music</p>
         <div className="flex-1 h-px bg-gradient-to-l from-[oklch(0.78_0.12_85/0.4)] to-transparent" />
         <span className="text-[oklch(0.78_0.12_85)]">♪</span>
       </div>
@@ -59,7 +129,7 @@ function SheetMusicSearch() {
             type="text"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="Search for any piano composition or composer… e.g. Chopin Ballade No. 1"
+            placeholder="Search any piano composition or composer… e.g. Chopin Ballade No. 1"
             className="w-full pl-10 pr-28 py-3.5 rounded-xl bg-[oklch(0.16_0.018_265)] border border-[oklch(0.26_0.016_265)] text-[oklch(0.88_0.01_85)] placeholder-[oklch(0.40_0.012_265)] text-sm focus:outline-none focus:border-[oklch(0.78_0.12_85/0.6)] focus:ring-1 focus:ring-[oklch(0.78_0.12_85/0.3)] transition-all"
           />
           {query && (
@@ -80,57 +150,122 @@ function SheetMusicSearch() {
             Search
           </button>
         </div>
-        <p className="text-[0.65rem] text-[oklch(0.38_0.010_265)] mt-2 ml-1">
-          Searches IMSLP — the world’s largest free sheet music library. Results open on IMSLP where you can download the PDF.
-        </p>
       </form>
 
-      {/* Results */}
+      {/* Results panel */}
       {open && submitted && (
         <div className="mt-5">
-          {isFetching ? (
-            <div className="nocturne-card p-8 text-center">
-              <Loader2 size={24} className="text-[oklch(0.78_0.12_85)] animate-spin mx-auto mb-3" />
-              <p className="text-sm text-[oklch(0.55_0.015_265)]">Searching IMSLP for “{submitted}”…</p>
-            </div>
-          ) : results.length === 0 ? (
-            <div className="nocturne-card p-8 text-center border-dashed">
-              <FileText size={28} className="text-[oklch(0.35_0.010_265)] mx-auto mb-3" />
-              <p className="text-sm text-[oklch(0.55_0.015_265)]">No results found for “{submitted}” on IMSLP.</p>
-              <p className="text-xs text-[oklch(0.38_0.010_265)] mt-1">Try a different spelling or search by composer name only.</p>
-            </div>
-          ) : (
-            <div className="grid gap-2">
-              <p className="text-[0.65rem] font-mono text-[oklch(0.45_0.012_265)] uppercase tracking-wider mb-1">
-                {results.length} result{results.length !== 1 ? "s" : ""} from IMSLP
-              </p>
-              {results.map((r, i) => (
-                <a
-                  key={i}
-                  href={r.pageUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="nocturne-card p-4 flex items-start gap-4 hover:border-[oklch(0.78_0.12_85/0.50)] hover:bg-[oklch(0.17_0.016_265)] transition-all duration-150 group/result"
-                >
-                  <div className="w-8 h-8 rounded-lg bg-[oklch(0.78_0.12_85/0.10)] border border-[oklch(0.78_0.12_85/0.20)] flex items-center justify-center shrink-0 mt-0.5">
-                    <FileText size={14} className="text-[oklch(0.78_0.12_85)]" />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="font-['Playfair_Display'] font-semibold text-[oklch(0.88_0.01_85)] text-sm truncate group-hover/result:text-[oklch(0.78_0.12_85)] transition-colors">
-                      {r.title}
-                    </p>
-                    {r.snippet && (
-                      <p className="text-xs text-[oklch(0.45_0.012_265)] line-clamp-2 leading-relaxed mt-0.5">
-                        {r.snippet}
+          {/* Tab switcher */}
+          <div className="flex gap-1 mb-4 p-1 rounded-lg bg-[oklch(0.14_0.016_265)] border border-[oklch(0.22_0.014_265)] w-fit">
+            <button
+              onClick={() => setActiveTab("scores")}
+              className={`px-4 py-1.5 rounded-md text-xs font-mono uppercase tracking-wider transition-all ${
+                activeTab === "scores"
+                  ? "bg-[oklch(0.78_0.12_85)] text-[oklch(0.12_0.018_265)] font-bold"
+                  : "text-[oklch(0.50_0.012_265)] hover:text-[oklch(0.70_0.012_265)]"
+              }`}
+            >
+              📄 Sheet Music
+            </button>
+            <button
+              onClick={() => setActiveTab("streaming")}
+              className={`px-4 py-1.5 rounded-md text-xs font-mono uppercase tracking-wider transition-all ${
+                activeTab === "streaming"
+                  ? "bg-[oklch(0.78_0.12_85)] text-[oklch(0.12_0.018_265)] font-bold"
+                  : "text-[oklch(0.50_0.012_265)] hover:text-[oklch(0.70_0.012_265)]"
+              }`}
+            >
+              🎵 Stream
+            </button>
+          </div>
+
+          {/* Sheet music tab */}
+          {activeTab === "scores" && (
+            isFetching ? (
+              <div className="nocturne-card p-8 text-center">
+                <Loader2 size={24} className="text-[oklch(0.78_0.12_85)] animate-spin mx-auto mb-3" />
+                <p className="text-sm text-[oklch(0.55_0.015_265)]">Searching IMSLP for "{submitted}"…</p>
+              </div>
+            ) : results.length === 0 ? (
+              <div className="nocturne-card p-8 text-center border-dashed">
+                <FileText size={28} className="text-[oklch(0.35_0.010_265)] mx-auto mb-3" />
+                <p className="text-sm text-[oklch(0.55_0.015_265)]">No results found for "{submitted}" on IMSLP.</p>
+                <p className="text-xs text-[oklch(0.38_0.010_265)] mt-1">Try a different spelling or search by composer name only.</p>
+              </div>
+            ) : (
+              <div className="grid gap-2">
+                <p className="text-[0.65rem] font-mono text-[oklch(0.45_0.012_265)] uppercase tracking-wider mb-1">
+                  {results.length} result{results.length !== 1 ? "s" : ""} from IMSLP — free PDF download
+                </p>
+                {results.map((r, i) => (
+                  <a
+                    key={i}
+                    href={r.pageUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="nocturne-card p-4 flex items-start gap-4 hover:border-[oklch(0.78_0.12_85/0.50)] hover:bg-[oklch(0.17_0.016_265)] transition-all duration-150 group/result"
+                  >
+                    <div className="w-8 h-8 rounded-lg bg-[oklch(0.78_0.12_85/0.10)] border border-[oklch(0.78_0.12_85/0.20)] flex items-center justify-center shrink-0 mt-0.5">
+                      <FileText size={14} className="text-[oklch(0.78_0.12_85)]" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="font-['Playfair_Display'] font-semibold text-[oklch(0.88_0.01_85)] text-sm truncate group-hover/result:text-[oklch(0.78_0.12_85)] transition-colors">
+                        {r.title}
                       </p>
-                    )}
-                    <p className="text-[0.6rem] font-mono text-[oklch(0.78_0.12_85/0.7)] mt-1.5 flex items-center gap-1">
-                      <ExternalLink size={9} /> Open on IMSLP — free PDF download
-                    </p>
-                  </div>
-                  <ExternalLink size={14} className="text-[oklch(0.35_0.010_265)] group-hover/result:text-[oklch(0.78_0.12_85)] transition-colors shrink-0 mt-1" />
-                </a>
-              ))}
+                      {r.snippet && (
+                        <p className="text-xs text-[oklch(0.45_0.012_265)] line-clamp-2 leading-relaxed mt-0.5">
+                          {r.snippet}
+                        </p>
+                      )}
+                      <p className="text-[0.6rem] font-mono text-[oklch(0.78_0.12_85/0.7)] mt-1.5 flex items-center gap-1">
+                        <ExternalLink size={9} /> Open on IMSLP — free PDF download
+                      </p>
+                    </div>
+                    <ExternalLink size={14} className="text-[oklch(0.35_0.010_265)] group-hover/result:text-[oklch(0.78_0.12_85)] transition-colors shrink-0 mt-1" />
+                  </a>
+                ))}
+              </div>
+            )
+          )}
+
+          {/* Streaming tab */}
+          {activeTab === "streaming" && (
+            <div>
+              <p className="text-[0.65rem] font-mono text-[oklch(0.45_0.012_265)] uppercase tracking-wider mb-3">
+                Listen to "{submitted}" on your platform
+              </p>
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                {STREAMING_PLATFORMS.map((platform) => (
+                  <a
+                    key={platform.name}
+                    href={platform.getUrl(submitted)}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="nocturne-card p-4 flex items-center gap-3 hover:scale-[1.02] transition-all duration-150 group/platform"
+                    style={{
+                      background: `${platform.bg}`,
+                      borderColor: `${platform.border}`,
+                    }}
+                  >
+                    <div
+                      className="w-9 h-9 rounded-lg flex items-center justify-center shrink-0"
+                      style={{ color: platform.textColor, background: `${platform.bg}`, border: `1px solid ${platform.border}` }}
+                    >
+                      {platform.icon}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="font-mono font-bold text-xs" style={{ color: platform.textColor }}>
+                        {platform.name}
+                      </p>
+                      <p className="text-[0.6rem] text-[oklch(0.40_0.010_265)] mt-0.5">Search &amp; stream</p>
+                    </div>
+                    <ExternalLink size={12} className="text-[oklch(0.35_0.010_265)] group-hover/platform:opacity-100 opacity-50 transition-opacity shrink-0" />
+                  </a>
+                ))}
+              </div>
+              <p className="text-[0.6rem] text-[oklch(0.32_0.008_265)] mt-3 ml-1">
+                Links open each platform's search for "{submitted}". A subscription may be required to stream on some platforms.
+              </p>
             </div>
           )}
         </div>
