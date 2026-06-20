@@ -16,20 +16,12 @@ const LOGO_TREBLE = "https://d2xsxph8kpxj0f.cloudfront.net/310519663449376037/iy
 
 // ── PDF text extraction (client-side, best-effort) ───────────────────────────
 async function extractTextFromFile(file: File): Promise<string> {
-  // For PDFs we just send the raw bytes; the AI will use the filename + any text
-  // For image files we send a note about the image
-  if (file.type === "application/pdf") {
-    return `[PDF file: ${file.name}. The score has been uploaded for analysis.]`;
+  // Text extraction from PDF/images is now done server-side via pdftotext.
+  // For plain text files, we can still read them directly.
+  if (file.type === "text/plain") {
+    try { return await file.text(); } catch { /* ignore */ }
   }
-  if (file.type.startsWith("image/")) {
-    return `[Image file: ${file.name}. The score image has been uploaded for analysis.]`;
-  }
-  // For text files, read directly
-  try {
-    return await file.text();
-  } catch {
-    return `[File: ${file.name}]`;
-  }
+  return "";
 }
 
 // ── File to base64 ────────────────────────────────────────────────────────────

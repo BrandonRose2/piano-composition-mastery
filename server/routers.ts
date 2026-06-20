@@ -62,12 +62,10 @@ export const appRouter = router({
         if (!composition) throw new Error("Failed to create composition record");
 
         const compositionId = composition.id;
-        const extractedText = input.extractedText;
         const fileName = input.fileName;
-
         const mimeType = input.mimeType;
-        // Build a public URL for the file so the AI can read the actual score
-        const publicFileUrl = `${process.env.BUILT_IN_FORGE_API_URL?.replace(/\/+$/, '') ?? ''}/v1/storage/file/${key}`;
+        // Keep the buffer in closure for server-side PDF text extraction
+        const fileBuffer = buffer;
 
         // Use setTimeout(0) instead of setImmediate for broader runtime compatibility
         setTimeout(async () => {
@@ -76,8 +74,7 @@ export const appRouter = router({
             await updateCompositionStatus(compositionId, "analyzing");
             const { analysis, framework } = await analyzeComposition(
               fileName,
-              extractedText,
-              publicFileUrl,
+              fileBuffer,
               mimeType
             );
             await updateCompositionStatus(compositionId, "complete", { analysis, framework });
