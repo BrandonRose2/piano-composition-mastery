@@ -128,6 +128,14 @@ export async function updateCompositionStatus(
   await db.update(compositions).set(set).where(eq(compositions.id, id));
 }
 
+export async function deleteComposition(id: number) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  // Delete associated progress records first (cascade)
+  await db.delete(practiceProgress).where(eq(practiceProgress.compositionId, id));
+  await db.delete(compositions).where(eq(compositions.id, id));
+}
+
 // ── Progress helpers ───────────────────────────────────────────────────────
 
 export async function getProgressForComposition(compositionId: number) {

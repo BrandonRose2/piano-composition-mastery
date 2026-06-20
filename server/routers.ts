@@ -8,6 +8,7 @@ import {
   getCompositionById,
   listCompositions,
   updateCompositionStatus,
+  deleteComposition,
   getProgressForComposition,
   toggleDayProgress,
 } from "./db";
@@ -97,6 +98,13 @@ export const appRouter = router({
         const comp = await getCompositionById(input.id);
         if (!comp) throw new Error("Composition not found");
         return { status: comp.status, errorMessage: comp.errorMessage };
+      }),
+
+    delete: publicProcedure
+      .input(z.object({ id: z.number() }))
+      .mutation(async ({ input }) => {
+        await deleteComposition(input.id);
+        return { success: true };
       }),
   }),
 

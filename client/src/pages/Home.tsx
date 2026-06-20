@@ -8,7 +8,7 @@ import { useState, useCallback, useRef, useEffect } from "react";
 import { useLocation } from "wouter";
 import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
-import { Music, Upload, BookOpen, ChevronRight, Loader2, AlertCircle, CheckCircle2, Clock } from "lucide-react";
+import { Music, Upload, BookOpen, ChevronRight, Loader2, AlertCircle, CheckCircle2, Clock, Trash2, Youtube, ExternalLink } from "lucide-react";
 
 // ── Asset URLs ────────────────────────────────────────────────────────────────
 const HERO_BG = "https://d2xsxph8kpxj0f.cloudfront.net/310519663449376037/iyZgf5CgymBq6EtTfh66yp/hero_bg-DDCWpXMzKGFmMUM3oU8SpS.webp";
@@ -154,7 +154,9 @@ function UploadZone({ onUpload }: { onUpload: (file: File) => void }) {
 // ── Composition Card ──────────────────────────────────────────────────────────
 function CompositionCard({ composition }: { composition: any }) {
   const [, navigate] = useLocation();
+  const [confirmDelete, setConfirmDelete] = useState(false);
   const analysis = composition.analysis as any;
+  const utils = trpc.useUtils();
 
   // Poll while pending or analyzing; also poll once on error to get the message
   const { data: statusData } = trpc.compositions.status.useQuery(
@@ -168,65 +170,116 @@ function CompositionCard({ composition }: { composition: any }) {
     }
   );
 
+  const deleteMutation = trpc.compositions.delete.useMutation({
+    onSuccess: () => {
+      utils.compositions.list.invalidate();
+      toast.success("Composition removed from your library.");
+    },
+    onError: (err) => {
+      toast.error("Failed to remove: " + err.message);
+      setConfirmDelete(false);
+    },
+  });
+
   const currentStatus = statusData?.status ?? composition.status;
   const errorMsg = statusData?.errorMessage ?? null;
 
+  const handleDelete = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (confirmDelete) {
+      deleteMutation.mutate({ id: composition.id });
+    } else {
+      setConfirmDelete(true);
+      setTimeout(() => setConfirmDelete(false), 3000);
+    }
+  };
+
   return (
-    <button
-      onClick={() => currentStatus === "complete" && navigate(`/composition/${composition.id}`)}
-      disabled={currentStatus !== "complete"}
-      className={`w-full text-left nocturne-card p-5 transition-all duration-200 group
-        ${currentStatus === "complete"
-          ? "hover:border-[oklch(0.50_0.06_85)] hover:bg-[oklch(0.17_0.016_265)] cursor-pointer"
-          : "cursor-default opacity-80"
-        }`}
-    >
-      <div className="flex items-start gap-4">
-        <div className="w-10 h-10 rounded-lg bg-[oklch(0.78_0.12_85/0.10)] border border-[oklch(0.78_0.12_85/0.20)] flex items-center justify-center shrink-0">
-          <Music size={18} className="text-[oklch(0.78_0.12_85)]" />
-        </div>
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2 mb-1">
-            <p className="font-['Playfair_Display'] font-semibold text-[oklch(0.88_0.01_85)] truncate">
-              {analysis?.title ?? composition.title}
-            </p>
-            <StatusBadge status={currentStatus} />
+    <div className="relative group/card">
+      <button
+        onClick={() => currentStatus === "complete" && navigate(`/composition/${composition.id}`)}
+        disabled={currentStatus !== "complete"}
+        className={`w-full text-left nocturne-card p-5 transition-all duration-200 group
+          ${currentStatus === "complete"
+            ? "hover:border-[oklch(0.50_0.06_85)] hover:bg-[oklch(0.17_0.016_265)] cursor-pointer"
+            : "cursor-default opacity-80"
+          }`}
+      >
+        <div className="flex items-start gap-4">
+          <div className="w-10 h-10 rounded-lg bg-[oklch(0.78_0.12_85/0.10)] border border-[oklch(0.78_0.12_85/0.20)] flex items-center justify-center shrink-0">
+            <Music size={18} className="text-[oklch(0.78_0.12_85)]" />
           </div>
-          {analysis?.composer && (
-            <p className="text-xs text-[oklch(0.55_0.015_265)] mb-1">{analysis.composer}</p>
-          )}
-          {analysis?.overview ? (
-            <p className="text-xs text-[oklch(0.45_0.012_265)] line-clamp-2 leading-relaxed">
-              {analysis.overview}
-            </p>
-          ) : currentStatus === "analyzing" ? (
-            <p className="text-xs text-amber-400/70 italic">AI is generating your analysis and 30-day framework…</p>
-          ) : currentStatus === "error" ? (
-            <p className="text-xs text-red-400/70 italic">
-              {errorMsg ? `Error: ${errorMsg.slice(0, 120)}` : "Analysis failed. Please try uploading again."}
-            </p>
-          ) : (
-            <p className="text-xs text-[oklch(0.40_0.012_265)] italic">Queued for analysis…</p>
-          )}
-          <div className="flex items-center gap-3 mt-2">
-            {analysis?.difficulty && (
-              <span className="text-[0.6rem] font-mono text-[oklch(0.50_0.012_265)] border border-[oklch(0.24_0.016_265)] rounded px-1.5 py-0.5">
-                {analysis.difficulty}
+          <div className="flex-1 min-w-0 pr-8">
+            <div className="flex items-center gap-2 mb-1">
+              <p className="font-['Playfair_Display'] font-semibold text-[oklch(0.88_0.01_85)] truncate">
+                {analysis?.title ?? composition.title}
+              </p>
+              <StatusBadge status={currentStatus} />
+            </div>
+            {analysis?.composer && (
+              <p className="text-xs text-[oklch(0.55_0.015_265)] mb-1">{analysis.composer}</p>
+            )}
+            {analysis?.overview ? (
+              <p className="text-xs text-[oklch(0.45_0.012_265)] line-clamp-2 leading-relaxed">
+                {analysis.overview}
+              </p>
+            ) : currentStatus === "analyzing" ? (
+              <p className="text-xs text-amber-400/70 italic">AI is generating your analysis and 30-day framework…</p>
+            ) : currentStatus === "error" ? (
+              <p className="text-xs text-red-400/70 italic">
+                {errorMsg ? `Error: ${errorMsg.slice(0, 120)}` : "Analysis failed. Please try uploading again."}
+              </p>
+            ) : (
+              <p className="text-xs text-[oklch(0.40_0.012_265)] italic">Queued for analysis…</p>
+            )}
+            <div className="flex items-center gap-3 mt-2">
+              {analysis?.difficulty && (
+                <span className="text-[0.6rem] font-mono text-[oklch(0.50_0.012_265)] border border-[oklch(0.24_0.016_265)] rounded px-1.5 py-0.5">
+                  {analysis.difficulty}
+                </span>
+              )}
+              {analysis?.key && (
+                <span className="text-[0.6rem] font-mono text-[oklch(0.50_0.012_265)]">{analysis.key}</span>
+              )}
+              <span className="text-[0.6rem] font-mono text-[oklch(0.35_0.010_265)]">
+                {new Date(composition.createdAt).toLocaleDateString()}
               </span>
-            )}
-            {analysis?.key && (
-              <span className="text-[0.6rem] font-mono text-[oklch(0.50_0.012_265)]">{analysis.key}</span>
-            )}
-            <span className="text-[0.6rem] font-mono text-[oklch(0.35_0.010_265)]">
-              {new Date(composition.createdAt).toLocaleDateString()}
-            </span>
+            </div>
           </div>
+          {currentStatus === "complete" && (
+            <ChevronRight size={16} className="text-[oklch(0.40_0.012_265)] group-hover:text-[oklch(0.78_0.12_85)] transition-colors shrink-0 mt-1" />
+          )}
         </div>
-        {currentStatus === "complete" && (
-          <ChevronRight size={16} className="text-[oklch(0.40_0.012_265)] group-hover:text-[oklch(0.78_0.12_85)] transition-colors shrink-0 mt-1" />
+      </button>
+
+      {/* Delete button — appears on hover */}
+      <button
+        onClick={handleDelete}
+        disabled={deleteMutation.isPending}
+        title={confirmDelete ? "Click again to confirm removal" : "Remove from library"}
+        className={`absolute top-3 right-3 p-1.5 rounded-md transition-all duration-150
+          opacity-0 group-hover/card:opacity-100 focus:opacity-100
+          ${
+            confirmDelete
+              ? "bg-red-500/20 border border-red-500/50 text-red-400 opacity-100"
+              : "bg-[oklch(0.18_0.016_265)] border border-[oklch(0.26_0.016_265)] text-[oklch(0.45_0.012_265)] hover:text-red-400 hover:border-red-500/40 hover:bg-red-500/10"
+          }
+        `}
+      >
+        {deleteMutation.isPending ? (
+          <Loader2 size={13} className="animate-spin" />
+        ) : (
+          <Trash2 size={13} />
         )}
-      </div>
-    </button>
+      </button>
+
+      {/* Confirm tooltip */}
+      {confirmDelete && (
+        <div className="absolute top-10 right-3 z-20 bg-[oklch(0.16_0.018_265)] border border-red-500/30 rounded-md px-2.5 py-1.5 text-[0.65rem] text-red-300 whitespace-nowrap shadow-lg pointer-events-none">
+          Click again to confirm
+        </div>
+      )}
+    </div>
   );
 }
 

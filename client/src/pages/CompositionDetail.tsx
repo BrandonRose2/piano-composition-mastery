@@ -8,7 +8,7 @@ import { useParams, useLocation } from "wouter";
 import { trpc } from "@/lib/trpc";
 import {
   ChevronDown, ChevronUp, ChevronLeft, Music, BookOpen, Dumbbell, Calendar,
-  Info, CheckCircle2, Circle, RotateCcw, Loader2, AlertCircle
+  Info, CheckCircle2, Circle, RotateCcw, Loader2, AlertCircle, Youtube
 } from "lucide-react";
 
 const LOGO_TREBLE = "https://d2xsxph8kpxj0f.cloudfront.net/310519663449376037/iyZgf5CgymBq6EtTfh66yp/logo_treble-Ys7HU4Ydwkc3JS4KPHV5db.webp";
@@ -485,19 +485,40 @@ export default function CompositionDetail() {
                 <table className="w-full text-sm border-collapse">
                   <thead>
                     <tr className="border-b border-t border-[oklch(0.78_0.12_85/0.4)]">
-                      {["No.", "Technical Focus", "Application"].map(h => (
-                        <th key={h} className="text-left py-3 px-4 font-mono text-xs text-[oklch(0.78_0.12_85)] uppercase tracking-widest">{h}</th>
+                      {["No.", "Technical Focus", "Application", ""].map((h, idx) => (
+                        <th key={idx} className="text-left py-3 px-4 font-mono text-xs text-[oklch(0.78_0.12_85)] uppercase tracking-widest">{h}</th>
                       ))}
                     </tr>
                   </thead>
                   <tbody>
-                    {(analysis.hanonExercises ?? []).map((ex: any, i: number) => (
-                      <tr key={i} className="border-b border-[oklch(0.22_0.014_265)] hover:bg-[oklch(0.17_0.016_265)] transition-colors">
-                        <td className="py-3 px-4 font-mono text-[oklch(0.78_0.12_85)] font-medium">{ex.number}</td>
-                        <td className="py-3 px-4 text-[oklch(0.75_0.01_85)]">{ex.focus}</td>
-                        <td className="py-3 px-4 text-[oklch(0.58_0.015_265)]">{ex.application}</td>
-                      </tr>
-                    ))}
+                    {(analysis.hanonExercises ?? []).map((ex: any, i: number) => {
+                      // Build a YouTube search URL for this specific Hanon exercise
+                      const ytQuery = encodeURIComponent(`Hanon ${ex.number} piano exercise tutorial`);
+                      const ytUrl = `https://www.youtube.com/results?search_query=${ytQuery}`;
+                      return (
+                        <tr key={i} className="border-b border-[oklch(0.22_0.014_265)] hover:bg-[oklch(0.17_0.016_265)] transition-colors">
+                          <td className="py-3 px-4 font-mono text-[oklch(0.78_0.12_85)] font-medium">{ex.number}</td>
+                          <td className="py-3 px-4 text-[oklch(0.75_0.01_85)]">{ex.focus}</td>
+                          <td className="py-3 px-4 text-[oklch(0.58_0.015_265)]">{ex.application}</td>
+                          <td className="py-3 px-4">
+                            <a
+                              href={ytUrl}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              onClick={(e) => e.stopPropagation()}
+                              title={`Watch Hanon ${ex.number} tutorial on YouTube`}
+                              className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[0.65rem] font-mono font-medium
+                                bg-red-600/15 border border-red-600/30 text-red-400
+                                hover:bg-red-600/25 hover:border-red-500/50 hover:text-red-300
+                                transition-all duration-150 whitespace-nowrap"
+                            >
+                              <Youtube size={11} />
+                              Watch
+                            </a>
+                          </td>
+                        </tr>
+                      );
+                    })}
                   </tbody>
                 </table>
               </div>
