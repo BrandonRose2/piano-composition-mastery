@@ -8,7 +8,7 @@ import { useState, useCallback, useRef, useEffect } from "react";
 import { useLocation } from "wouter";
 import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
-import { Music, Upload, BookOpen, ChevronRight, Loader2, AlertCircle, CheckCircle2, Clock, Trash2, Youtube, ExternalLink, LogOut, User, Search, FileText, ExternalLink as LinkIcon, X } from "lucide-react";
+import { Music, Upload, BookOpen, ChevronRight, Loader2, AlertCircle, CheckCircle2, Clock, Trash2, Youtube, ExternalLink, LogOut, User, Search, FileText, X, Download, Import } from "lucide-react";
 import { useAuth } from "@/_core/hooks/useAuth";
 
 // ── Asset URLs ────────────────────────────────────────────────────────────────
@@ -85,11 +85,135 @@ const STREAMING_PLATFORMS = [
   },
 ];
 
+// ── Import from URL dialog ────────────────────────────────────────────────────
+function ImportFromUrlDialog({
+  imslpTitle,
+  imslpPageUrl,
+  onClose,
+  onImported,
+}: {
+  imslpTitle: string;
+  imslpPageUrl: string;
+  onClose: () => void;
+  onImported: (id: number, title: string) => void;
+}) {
+  const [pdfUrl, setPdfUrl] = useState("");
+  const [titleHint, setTitleHint] = useState(imslpTitle);
+  const [, navigate] = useLocation();
+
+  const importMutation = trpc.sheetMusicImport.importFromUrl.useMutation({
+    onSuccess: (data) => {
+      toast.success(`"${data.title}" added to your library! AI analysis is running…`);
+      onImported(data.id, data.title);
+      onClose();
+      navigate(`/composition/${data.id}`);
+    },
+    onError: (err) => {
+      toast.error(`Import failed: ${err.message}`);
+    },
+  });
+
+  const handleImport = (e: React.FormEvent) => {
+    e.preventDefault();
+    const url = pdfUrl.trim();
+    if (!url) return;
+    importMutation.mutate({ pdfUrl: url, titleHint: titleHint.trim() });
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4" onClick={onClose}>
+      <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" />
+      <div
+        className="relative w-full max-w-lg nocturne-card p-6 rounded-2xl shadow-2xl"
+        onClick={(e) => e.stopPropagation()}
+      >
+        {/* Header */}
+        <div className="flex items-start justify-between mb-5">
+          <div>
+            <h3 className="font-['Playfair_Display'] font-bold text-[oklch(0.88_0.01_85)] text-lg">
+              Import to Library
+            </h3>
+            <p className="text-xs text-[oklch(0.45_0.012_265)] mt-1">
+              Paste the direct PDF download URL from IMSLP
+            </p>
+          </div>
+          <button onClick={onClose} className="text-[oklch(0.40_0.012_265)] hover:text-[oklch(0.65_0.015_265)] transition-colors">
+            <X size={18} />
+          </button>
+        </div>
+
+        {/* IMSLP link helper */}
+        <div className="mb-4 p-3 rounded-lg bg-[oklch(0.78_0.12_85/0.08)] border border-[oklch(0.78_0.12_85/0.20)]">
+          <p className="text-[0.65rem] font-mono text-[oklch(0.78_0.12_85)] uppercase tracking-wider mb-1">How to get the PDF URL</p>
+          <ol className="text-xs text-[oklch(0.55_0.015_265)] space-y-1 list-decimal list-inside">
+            <li>Open the IMSLP page for this piece</li>
+            <li>Click any score entry to expand it</li>
+            <li>Right-click the PDF download button → "Copy link address"</li>
+            <li>Paste the URL below</li>
+          </ol>
+          <a
+            href={imslpPageUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-1.5 mt-2 text-[0.65rem] font-mono text-[oklch(0.78_0.12_85)] hover:underline"
+          >
+            <ExternalLink size={10} /> Open "{imslpTitle}" on IMSLP
+          </a>
+        </div>
+
+        <form onSubmit={handleImport} className="space-y-3">
+          {/* Title field */}
+          <div>
+            <label className="block text-[0.65rem] font-mono text-[oklch(0.50_0.012_265)] uppercase tracking-wider mb-1">
+              Composition Title
+            </label>
+            <input
+              type="text"
+              value={titleHint}
+              onChange={(e) => setTitleHint(e.target.value)}
+              placeholder="e.g. Chopin Ballade No. 1 in G minor"
+              className="w-full px-3 py-2.5 rounded-lg bg-[oklch(0.16_0.018_265)] border border-[oklch(0.26_0.016_265)] text-[oklch(0.88_0.01_85)] placeholder-[oklch(0.35_0.010_265)] text-sm focus:outline-none focus:border-[oklch(0.78_0.12_85/0.6)] transition-all"
+            />
+          </div>
+
+          {/* PDF URL field */}
+          <div>
+            <label className="block text-[0.65rem] font-mono text-[oklch(0.50_0.012_265)] uppercase tracking-wider mb-1">
+              Direct PDF URL <span className="text-[oklch(0.78_0.12_85)]">(required)</span>
+            </label>
+            <input
+              type="url"
+              value={pdfUrl}
+              onChange={(e) => setPdfUrl(e.target.value)}
+              placeholder="https://imslp.org/images/…/file.pdf"
+              className="w-full px-3 py-2.5 rounded-lg bg-[oklch(0.16_0.018_265)] border border-[oklch(0.26_0.016_265)] text-[oklch(0.88_0.01_85)] placeholder-[oklch(0.35_0.010_265)] text-sm focus:outline-none focus:border-[oklch(0.78_0.12_85/0.6)] transition-all font-mono text-xs"
+              required
+            />
+          </div>
+
+          <button
+            type="submit"
+            disabled={!pdfUrl.trim() || importMutation.isPending}
+            className="w-full py-3 rounded-xl bg-[oklch(0.78_0.12_85)] text-[oklch(0.12_0.018_265)] font-mono font-bold text-sm uppercase tracking-wider hover:bg-[oklch(0.85_0.10_85)] disabled:opacity-50 disabled:cursor-not-allowed transition-all flex items-center justify-center gap-2"
+          >
+            {importMutation.isPending ? (
+              <><Loader2 size={16} className="animate-spin" /> Importing & Analyzing…</>
+            ) : (
+              <><Download size={16} /> Import to Library</>  
+            )}
+          </button>
+        </form>
+      </div>
+    </div>
+  );
+}
+
 function SheetMusicSearch() {
   const [query, setQuery] = useState("");
   const [submitted, setSubmitted] = useState("");
   const [open, setOpen] = useState(false);
   const [activeTab, setActiveTab] = useState<"scores" | "streaming">("scores");
+  const [importDialog, setImportDialog] = useState<{ title: string; pageUrl: string } | null>(null);
 
   const { data: results = [], isFetching } = trpc.sheetMusic.search.useQuery(
     { query: submitted },
@@ -198,11 +322,8 @@ function SheetMusicSearch() {
                   {results.length} result{results.length !== 1 ? "s" : ""} from IMSLP — free PDF download
                 </p>
                 {results.map((r, i) => (
-                  <a
+                  <div
                     key={i}
-                    href={r.pageUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
                     className="nocturne-card p-4 flex items-start gap-4 hover:border-[oklch(0.78_0.12_85/0.50)] hover:bg-[oklch(0.17_0.016_265)] transition-all duration-150 group/result"
                   >
                     <div className="w-8 h-8 rounded-lg bg-[oklch(0.78_0.12_85/0.10)] border border-[oklch(0.78_0.12_85/0.20)] flex items-center justify-center shrink-0 mt-0.5">
@@ -217,12 +338,25 @@ function SheetMusicSearch() {
                           {r.snippet}
                         </p>
                       )}
-                      <p className="text-[0.6rem] font-mono text-[oklch(0.78_0.12_85/0.7)] mt-1.5 flex items-center gap-1">
-                        <ExternalLink size={9} /> Open on IMSLP — free PDF download
-                      </p>
+                      <div className="flex items-center gap-3 mt-2">
+                        <a
+                          href={r.pageUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-[0.6rem] font-mono text-[oklch(0.78_0.12_85/0.7)] flex items-center gap-1 hover:text-[oklch(0.78_0.12_85)] transition-colors"
+                        >
+                          <ExternalLink size={9} /> Open on IMSLP
+                        </a>
+                        <button
+                          onClick={() => setImportDialog({ title: r.title, pageUrl: r.pageUrl })}
+                          className="text-[0.6rem] font-mono font-bold text-[oklch(0.78_0.12_85)] uppercase tracking-wider flex items-center gap-1 px-2 py-1 rounded-md bg-[oklch(0.78_0.12_85/0.12)] border border-[oklch(0.78_0.12_85/0.25)] hover:bg-[oklch(0.78_0.12_85/0.22)] transition-all"
+                        >
+                          <Download size={9} /> Import to Library
+                        </button>
+                      </div>
                     </div>
                     <ExternalLink size={14} className="text-[oklch(0.35_0.010_265)] group-hover/result:text-[oklch(0.78_0.12_85)] transition-colors shrink-0 mt-1" />
-                  </a>
+                  </div>
                 ))}
               </div>
             )
@@ -269,6 +403,16 @@ function SheetMusicSearch() {
             </div>
           )}
         </div>
+      )}
+
+      {/* Import from URL dialog */}
+      {importDialog && (
+        <ImportFromUrlDialog
+          imslpTitle={importDialog.title}
+          imslpPageUrl={importDialog.pageUrl}
+          onClose={() => setImportDialog(null)}
+          onImported={() => setImportDialog(null)}
+        />
       )}
     </div>
   );
@@ -448,8 +592,42 @@ function UploadZone({ onUpload }: { onUpload: (file: File) => void }) {
 function CompositionCard({ composition, progressSummary }: { composition: any; progressSummary: { completedDays: number; totalDays: number; percentage: number } | null }) {
   const [, navigate] = useLocation();
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [editingTitle, setEditingTitle] = useState(false);
+  const [titleDraft, setTitleDraft] = useState("");
+  const titleInputRef = useRef<HTMLInputElement>(null);
   const analysis = composition.analysis as any;
   const utils = trpc.useUtils();
+
+  const renameMutation = trpc.compositions.rename.useMutation({
+    onSuccess: () => {
+      utils.compositions.list.invalidate();
+      setEditingTitle(false);
+      toast.success("Title updated.");
+    },
+    onError: (err) => {
+      toast.error("Failed to rename: " + err.message);
+    },
+  });
+
+  const startEditing = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    const current = analysis?.title ?? composition.title;
+    setTitleDraft(current);
+    setEditingTitle(true);
+    setTimeout(() => titleInputRef.current?.focus(), 50);
+  };
+
+  const commitRename = () => {
+    const trimmed = titleDraft.trim();
+    if (!trimmed) { setEditingTitle(false); return; }
+    if (trimmed === (analysis?.title ?? composition.title)) { setEditingTitle(false); return; }
+    renameMutation.mutate({ id: composition.id, title: trimmed });
+  };
+
+  const handleTitleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === "Enter") { e.preventDefault(); commitRename(); }
+    if (e.key === "Escape") { setEditingTitle(false); }
+  };
 
   // Poll while pending or analyzing; also poll once on error to get the message
   const { data: statusData } = trpc.compositions.status.useQuery(
@@ -504,9 +682,26 @@ function CompositionCard({ composition, progressSummary }: { composition: any; p
           </div>
           <div className="flex-1 min-w-0 pr-8">
             <div className="flex items-center gap-2 mb-1">
-              <p className="font-['Playfair_Display'] font-semibold text-[oklch(0.88_0.01_85)] truncate">
-                {analysis?.title ?? composition.title}
-              </p>
+              {editingTitle ? (
+                <input
+                  ref={titleInputRef}
+                  value={titleDraft}
+                  onChange={(e) => setTitleDraft(e.target.value)}
+                  onBlur={commitRename}
+                  onKeyDown={handleTitleKeyDown}
+                  onClick={(e) => e.stopPropagation()}
+                  className="flex-1 font-['Playfair_Display'] font-semibold text-[oklch(0.88_0.01_85)] bg-[oklch(0.18_0.018_265)] border border-[oklch(0.78_0.12_85/0.5)] rounded px-2 py-0.5 text-sm focus:outline-none focus:ring-1 focus:ring-[oklch(0.78_0.12_85/0.4)] min-w-0"
+                />
+              ) : (
+                <p
+                  className="font-['Playfair_Display'] font-semibold text-[oklch(0.88_0.01_85)] truncate cursor-text hover:text-[oklch(0.78_0.12_85)] transition-colors group/title"
+                  title="Click to rename"
+                  onClick={startEditing}
+                >
+                  {analysis?.title ?? composition.title}
+                  <span className="ml-1.5 opacity-0 group-hover/title:opacity-60 text-[0.6rem] font-mono text-[oklch(0.78_0.12_85)] transition-opacity">✎</span>
+                </p>
+              )}
               <StatusBadge status={currentStatus} />
             </div>
             {analysis?.composer && (

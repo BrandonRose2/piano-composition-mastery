@@ -105,6 +105,21 @@ export const appRouter = router({
         return { status: comp.status, errorMessage: comp.errorMessage };
       }),
 
+    /** Rename a composition title */
+    rename: protectedProcedure
+      .input(z.object({ id: z.number(), title: z.string().min(1).max(200) }))
+      .mutation(async ({ input, ctx }) => {
+        const db = await (await import("./db")).getDb();
+        if (!db) throw new Error("Database unavailable");
+        const { compositions } = await import("../drizzle/schema");
+        const { eq, and } = await import("drizzle-orm");
+        await db
+          .update(compositions)
+          .set({ title: input.title })
+          .where(and(eq(compositions.id, input.id), eq(compositions.userId, ctx.user.id)));
+        return { success: true };
+      }),
+
     /** Delete a composition and all its progress records */
     delete: protectedProcedure
       .input(z.object({ id: z.number() }))
@@ -209,6 +224,88 @@ export const appRouter = router({
           console.error("[SheetMusic] IMSLP search failed:", err);
           return [];
         }
+      }),
+  }),
+
+  sheetMusicImport: router({
+    /**
+     * Fetch a PDF from a given URL, store it in S3, and kick off AI analysis.
+     * Used for importing sheet music directly from a URL (e.g. IMSLP direct PDF link).
+     */
+    importFromUrl: protectedProcedure
+      .input(
+        z.object({
+          pdfUrl: z.string().url(),
+          titleHint: z.string().optional().default(""),
+        })
+      )
+      .mutation(async ({ input, ctx }) => {
+        const userId = ctx.user.id;
+
+        // Fetch the PDF from the provided URL
+        const response = await fetch(input.pdfUrl, {
+          headers: {
+            "User-Agent": "Mozilla/5.0 (compatible; PianoMasteryPortal/1.0; educational use)",
+            "Accept": "application/pdf,*/*",
+          },
+          redirect: "follow",
+        });
+
+        if (!response.ok) {
+          throw new Error(`Failed to fetch PDF: HTTP ${response.status} from ${input.pdfUrl}`);
+        }
+
+        const contentType = response.headers.get("content-type") ?? "application/pdf";
+        if (!contentType.includes("pdf") && !contentType.includes("octet-stream")) {
+          throw new Error(`URL does not appear to be a PDF (content-type: ${contentType}). Please provide a direct PDF download link.`);
+        }
+
+        const arrayBuffer = await response.arrayBuffer();
+        const buffer = Buffer.from(arrayBuffer);
+
+        if (buffer.length < 100) {
+          throw new Error("Downloaded file is too small to be a valid PDF.");
+        }
+
+        // Derive a filename from the URL or the title hint
+        const urlPath = new URL(input.pdfUrl).pathname;
+        const rawName = decodeURIComponent(urlPath.split("/").pop() ?? "score.pdf");
+        const fileName = rawName.endsWith(".pdf") ? rawName : `${rawName}.pdf`;
+        const title = input.titleHint || fileName.replace(/\.pdf$/i, "").replace(/[-_]/g, " ");
+
+        const key = `compositions/${userId}/${Date.now()}-${fileName.replace(/[^a-zA-Z0-9._-]/g, "_")}`;
+        const { url: fileUrl } = await storagePut(key, buffer, "application/pdf");
+
+        const composition = await createComposition({
+          userId,
+          title,
+          fileName,
+          fileKey: key,
+          fileUrl,
+          mimeType: "application/pdf",
+          status: "pending",
+        });
+
+        if (!composition) throw new Error("Failed to create composition record");
+
+        const compositionId = composition.id;
+        const fileBuffer = buffer;
+
+        setTimeout(async () => {
+          try {
+            console.log(`[Analysis] Starting import analysis for composition ${compositionId}: ${title}`);
+            await updateCompositionStatus(compositionId, "analyzing");
+            const { analysis, framework } = await analyzeComposition(fileName, fileBuffer, "application/pdf");
+            await updateCompositionStatus(compositionId, "complete", { analysis, framework });
+            console.log(`[Analysis] Import analysis completed for composition ${compositionId}`);
+          } catch (err) {
+            const errMsg = err instanceof Error ? err.message : String(err);
+            console.error(`[Analysis] Import analysis failed for composition ${compositionId}:`, errMsg);
+            await updateCompositionStatus(compositionId, "error", { errorMessage: errMsg }).catch(() => {});
+          }
+        }, 0);
+
+        return { id: composition.id, title };
       }),
   }),
 
