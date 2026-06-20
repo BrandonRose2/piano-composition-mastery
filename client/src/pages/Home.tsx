@@ -133,7 +133,7 @@ function ImportFromUrlDialog({
             <h3 className="font-['Playfair_Display'] font-bold text-[oklch(0.88_0.01_85)] text-lg">
               Import to Library
             </h3>
-            <p className="text-xs text-[oklch(0.45_0.012_265)] mt-1">
+            <p className="text-xs text-[oklch(0.68_0.012_265)] mt-1">
               Paste the direct PDF download URL from IMSLP
             </p>
           </div>
@@ -145,7 +145,7 @@ function ImportFromUrlDialog({
         {/* IMSLP link helper */}
         <div className="mb-4 p-3 rounded-lg bg-[oklch(0.78_0.12_85/0.08)] border border-[oklch(0.78_0.12_85/0.20)]">
           <p className="text-[0.65rem] font-mono text-[oklch(0.78_0.12_85)] uppercase tracking-wider mb-1">How to get the PDF URL</p>
-          <ol className="text-xs text-[oklch(0.55_0.015_265)] space-y-1 list-decimal list-inside">
+          <ol className="text-xs text-[oklch(0.72_0.015_265)] space-y-1 list-decimal list-inside">
             <li>Open the IMSLP page for this piece</li>
             <li>Click any score entry to expand it</li>
             <li>Right-click the PDF download button → "Copy link address"</li>
@@ -164,7 +164,7 @@ function ImportFromUrlDialog({
         <form onSubmit={handleImport} className="space-y-3">
           {/* Title field */}
           <div>
-            <label className="block text-[0.65rem] font-mono text-[oklch(0.50_0.012_265)] uppercase tracking-wider mb-1">
+            <label className="block text-[0.65rem] font-mono text-[oklch(0.68_0.012_265)] uppercase tracking-wider mb-1">
               Composition Title
             </label>
             <input
@@ -178,7 +178,7 @@ function ImportFromUrlDialog({
 
           {/* PDF URL field */}
           <div>
-            <label className="block text-[0.65rem] font-mono text-[oklch(0.50_0.012_265)] uppercase tracking-wider mb-1">
+            <label className="block text-[0.65rem] font-mono text-[oklch(0.68_0.012_265)] uppercase tracking-wider mb-1">
               Direct PDF URL <span className="text-[oklch(0.78_0.12_85)]">(required)</span>
             </label>
             <input
@@ -248,7 +248,7 @@ function SheetMusicSearch() {
       {/* Search bar */}
       <form onSubmit={handleSearch} className="relative">
         <div className="relative flex items-center">
-          <Search size={16} className="absolute left-4 text-[oklch(0.50_0.012_265)] pointer-events-none" />
+          <Search size={16} className="absolute left-4 text-[oklch(0.68_0.012_265)] pointer-events-none" />
           <input
             type="text"
             value={query}
@@ -286,7 +286,7 @@ function SheetMusicSearch() {
               className={`px-4 py-1.5 rounded-md text-xs font-mono uppercase tracking-wider transition-all ${
                 activeTab === "scores"
                   ? "bg-[oklch(0.78_0.12_85)] text-[oklch(0.12_0.018_265)] font-bold"
-                  : "text-[oklch(0.50_0.012_265)] hover:text-[oklch(0.70_0.012_265)]"
+                  : "text-[oklch(0.68_0.012_265)] hover:text-[oklch(0.70_0.012_265)]"
               }`}
             >
               📄 Sheet Music
@@ -296,7 +296,7 @@ function SheetMusicSearch() {
               className={`px-4 py-1.5 rounded-md text-xs font-mono uppercase tracking-wider transition-all ${
                 activeTab === "streaming"
                   ? "bg-[oklch(0.78_0.12_85)] text-[oklch(0.12_0.018_265)] font-bold"
-                  : "text-[oklch(0.50_0.012_265)] hover:text-[oklch(0.70_0.012_265)]"
+                  : "text-[oklch(0.68_0.012_265)] hover:text-[oklch(0.70_0.012_265)]"
               }`}
             >
               🎵 Stream
@@ -308,17 +308,17 @@ function SheetMusicSearch() {
             isFetching ? (
               <div className="nocturne-card p-8 text-center">
                 <Loader2 size={24} className="text-[oklch(0.78_0.12_85)] animate-spin mx-auto mb-3" />
-                <p className="text-sm text-[oklch(0.55_0.015_265)]">Searching IMSLP for "{submitted}"…</p>
+                <p className="text-sm text-[oklch(0.72_0.015_265)]">Searching IMSLP for "{submitted}"…</p>
               </div>
             ) : results.length === 0 ? (
               <div className="nocturne-card p-8 text-center border-dashed">
                 <FileText size={28} className="text-[oklch(0.35_0.010_265)] mx-auto mb-3" />
-                <p className="text-sm text-[oklch(0.55_0.015_265)]">No results found for "{submitted}" on IMSLP.</p>
+                <p className="text-sm text-[oklch(0.72_0.015_265)]">No results found for "{submitted}" on IMSLP.</p>
                 <p className="text-xs text-[oklch(0.38_0.010_265)] mt-1">Try a different spelling or search by composer name only.</p>
               </div>
             ) : (
               <div className="grid gap-2">
-                <p className="text-[0.65rem] font-mono text-[oklch(0.45_0.012_265)] uppercase tracking-wider mb-1">
+                <p className="text-[0.65rem] font-mono text-[oklch(0.68_0.012_265)] uppercase tracking-wider mb-1">
                   {results.length} result{results.length !== 1 ? "s" : ""} from IMSLP — free PDF download
                 </p>
                 {results.map((r, i) => (
@@ -334,7 +334,7 @@ function SheetMusicSearch() {
                         {r.title}
                       </p>
                       {r.snippet && (
-                        <p className="text-xs text-[oklch(0.45_0.012_265)] line-clamp-2 leading-relaxed mt-0.5">
+                        <p className="text-xs text-[oklch(0.68_0.012_265)] line-clamp-2 leading-relaxed mt-0.5">
                           {r.snippet}
                         </p>
                       )}
@@ -365,7 +365,7 @@ function SheetMusicSearch() {
           {/* Streaming tab */}
           {activeTab === "streaming" && (
             <div>
-              <p className="text-[0.65rem] font-mono text-[oklch(0.45_0.012_265)] uppercase tracking-wider mb-3">
+              <p className="text-[0.65rem] font-mono text-[oklch(0.68_0.012_265)] uppercase tracking-wider mb-3">
                 Listen to "{submitted}" on your platform
               </p>
               <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
@@ -431,14 +431,14 @@ function NavBar() {
       </div>
       {user && (
         <div className="flex items-center gap-3">
-          <div className="flex items-center gap-2 text-xs font-mono text-[oklch(0.50_0.012_265)]">
+          <div className="flex items-center gap-2 text-xs font-mono text-[oklch(0.68_0.012_265)]">
             <User size={12} className="text-[oklch(0.78_0.12_85)]" />
             <span className="hidden sm:inline">{user.name ?? user.email ?? "Pianist"}</span>
           </div>
           <button
             onClick={() => logout()}
             className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-mono
-              text-[oklch(0.45_0.012_265)] border border-[oklch(0.22_0.016_265)]
+              text-[oklch(0.68_0.012_265)] border border-[oklch(0.22_0.016_265)]
               hover:text-[oklch(0.70_0.012_265)] hover:border-[oklch(0.35_0.016_265)]
               transition-all duration-150 active:scale-95"
             title="Sign out"
@@ -568,7 +568,7 @@ function UploadZone({ onUpload }: { onUpload: (file: File) => void }) {
           <p className="font-['Playfair_Display'] text-xl font-semibold text-[oklch(0.88_0.01_85)] mb-2">
             {dragging ? "Release to upload" : "Drop your piano score here"}
           </p>
-          <p className="text-sm text-[oklch(0.55_0.015_265)] mb-1">
+          <p className="text-sm text-[oklch(0.72_0.015_265)] mb-1">
             or <span className="text-[oklch(0.78_0.12_85)] underline underline-offset-2">click to browse</span>
           </p>
           <p className="text-xs text-[oklch(0.40_0.012_265)]">
@@ -578,7 +578,7 @@ function UploadZone({ onUpload }: { onUpload: (file: File) => void }) {
 
         <div className="flex flex-wrap justify-center gap-2 mt-2">
           {["Beethoven Sonatas", "Chopin Études", "Bach Inventions", "Mozart Variations", "Schubert Impromptus"].map((ex) => (
-            <span key={ex} className="text-[0.65rem] font-mono text-[oklch(0.45_0.010_265)] border border-[oklch(0.24_0.016_265)] rounded-full px-2.5 py-1">
+            <span key={ex} className="text-[0.65rem] font-mono text-[oklch(0.65_0.010_265)] border border-[oklch(0.24_0.016_265)] rounded-full px-2.5 py-1">
               {ex}
             </span>
           ))}
@@ -705,10 +705,10 @@ function CompositionCard({ composition, progressSummary }: { composition: any; p
               <StatusBadge status={currentStatus} />
             </div>
             {analysis?.composer && (
-              <p className="text-xs text-[oklch(0.55_0.015_265)] mb-1">{analysis.composer}</p>
+              <p className="text-xs text-[oklch(0.72_0.015_265)] mb-1">{analysis.composer}</p>
             )}
             {analysis?.overview ? (
-              <p className="text-xs text-[oklch(0.45_0.012_265)] line-clamp-2 leading-relaxed">
+              <p className="text-xs text-[oklch(0.68_0.012_265)] line-clamp-2 leading-relaxed">
                 {analysis.overview}
               </p>
             ) : currentStatus === "analyzing" ? (
@@ -739,12 +739,12 @@ function CompositionCard({ composition, progressSummary }: { composition: any; p
             )}
             <div className="flex items-center gap-3 mt-2">
               {analysis?.difficulty && (
-                <span className="text-[0.6rem] font-mono text-[oklch(0.50_0.012_265)] border border-[oklch(0.24_0.016_265)] rounded px-1.5 py-0.5">
+                <span className="text-[0.6rem] font-mono text-[oklch(0.68_0.012_265)] border border-[oklch(0.24_0.016_265)] rounded px-1.5 py-0.5">
                   {analysis.difficulty}
                 </span>
               )}
               {analysis?.key && (
-                <span className="text-[0.6rem] font-mono text-[oklch(0.50_0.012_265)]">{analysis.key}</span>
+                <span className="text-[0.6rem] font-mono text-[oklch(0.68_0.012_265)]">{analysis.key}</span>
               )}
               <span className="text-[0.6rem] font-mono text-[oklch(0.35_0.010_265)]">
                 {new Date(composition.createdAt).toLocaleDateString()}
@@ -767,7 +767,7 @@ function CompositionCard({ composition, progressSummary }: { composition: any; p
           ${
             confirmDelete
               ? "bg-red-500/20 border border-red-500/50 text-red-400 opacity-100"
-              : "bg-[oklch(0.18_0.016_265)] border border-[oklch(0.26_0.016_265)] text-[oklch(0.45_0.012_265)] hover:text-red-400 hover:border-red-500/40 hover:bg-red-500/10"
+              : "bg-[oklch(0.18_0.016_265)] border border-[oklch(0.26_0.016_265)] text-[oklch(0.68_0.012_265)] hover:text-red-400 hover:border-red-500/40 hover:bg-red-500/10"
           }
         `}
       >
@@ -807,13 +807,13 @@ function LaCampanellaCard() {
               <CheckCircle2 size={10} /> Featured
             </span>
           </div>
-          <p className="text-xs text-[oklch(0.55_0.015_265)] mb-1">Franz Liszt · S. 141 No. 3</p>
-          <p className="text-xs text-[oklch(0.45_0.012_265)] line-clamp-2 leading-relaxed">
+          <p className="text-xs text-[oklch(0.72_0.015_265)] mb-1">Franz Liszt · S. 141 No. 3</p>
+          <p className="text-xs text-[oklch(0.68_0.012_265)] line-clamp-2 leading-relaxed">
             The definitive 1851 G-sharp minor version — one of the most celebrated and technically demanding works in the piano repertoire.
           </p>
           <div className="flex items-center gap-3 mt-2">
-            <span className="text-[0.6rem] font-mono text-[oklch(0.50_0.012_265)] border border-[oklch(0.24_0.016_265)] rounded px-1.5 py-0.5">Advanced</span>
-            <span className="text-[0.6rem] font-mono text-[oklch(0.50_0.012_265)]">G-sharp minor</span>
+            <span className="text-[0.6rem] font-mono text-[oklch(0.68_0.012_265)] border border-[oklch(0.24_0.016_265)] rounded px-1.5 py-0.5">Advanced</span>
+            <span className="text-[0.6rem] font-mono text-[oklch(0.68_0.012_265)]">G-sharp minor</span>
           </div>
         </div>
         <ChevronRight size={16} className="text-[oklch(0.40_0.012_265)] group-hover:text-[oklch(0.78_0.12_85)] transition-colors shrink-0 mt-1" />
@@ -917,7 +917,7 @@ export default function Home() {
             <div key={step} className="nocturne-card p-5">
               <p className="font-mono text-[oklch(0.78_0.12_85)] text-2xl font-bold mb-3">{step}</p>
               <h3 className="font-['Playfair_Display'] font-semibold text-[oklch(0.88_0.01_85)] mb-2">{title}</h3>
-              <p className="text-sm text-[oklch(0.55_0.015_265)] leading-relaxed">{desc}</p>
+              <p className="text-sm text-[oklch(0.72_0.015_265)] leading-relaxed">{desc}</p>
             </div>
           ))}
         </div>
@@ -937,7 +937,7 @@ export default function Home() {
               <div className="flex flex-col items-center gap-4">
                 <Loader2 size={40} className="text-[oklch(0.78_0.12_85)] animate-spin" />
                 <p className="font-['Playfair_Display'] text-xl text-[oklch(0.88_0.01_85)]">Uploading your score…</p>
-                <p className="text-sm text-[oklch(0.55_0.015_265)]">Sending to AI for analysis</p>
+                <p className="text-sm text-[oklch(0.72_0.015_265)]">Sending to AI for analysis</p>
               </div>
             </div>
           ) : (
@@ -966,12 +966,12 @@ export default function Home() {
             {isLoading ? (
               <div className="nocturne-card p-8 text-center">
                 <Loader2 size={24} className="text-[oklch(0.78_0.12_85)] animate-spin mx-auto mb-3" />
-                <p className="text-sm text-[oklch(0.55_0.015_265)]">Loading your library…</p>
+                <p className="text-sm text-[oklch(0.72_0.015_265)]">Loading your library…</p>
               </div>
             ) : compositions.length === 0 ? (
               <div className="nocturne-card p-8 text-center border-dashed">
                 <BookOpen size={28} className="text-[oklch(0.35_0.010_265)] mx-auto mb-3" />
-                <p className="text-sm text-[oklch(0.45_0.012_265)]">No uploaded compositions yet.</p>
+                <p className="text-sm text-[oklch(0.68_0.012_265)]">No uploaded compositions yet.</p>
                 <p className="text-xs text-[oklch(0.35_0.010_265)] mt-1">Upload a score above to get started.</p>
               </div>
             ) : (

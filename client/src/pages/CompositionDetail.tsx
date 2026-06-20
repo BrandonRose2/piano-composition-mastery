@@ -174,7 +174,7 @@ function ProgressRing({ done, total }: { done: number; total: number }) {
       </svg>
       <div className="absolute inset-0 flex flex-col items-center justify-center">
         <span className="font-mono text-2xl font-bold text-[oklch(0.78_0.12_85)]">{done}</span>
-        <span className="font-mono text-[0.6rem] text-[oklch(0.50_0.012_265)] uppercase tracking-widest">of {total}</span>
+        <span className="font-mono text-[0.6rem] text-[oklch(0.68_0.012_265)] uppercase tracking-widest">of {total}</span>
       </div>
     </div>
   );
@@ -193,14 +193,14 @@ function PerformanceVideoSection({ title, composer }: { title: string; composer:
     return (
       <div className="nocturne-card p-8 flex items-center gap-4">
         <Loader2 size={20} className="animate-spin text-[oklch(0.78_0.12_85)]" />
-        <span className="text-sm text-[oklch(0.55_0.015_265)] font-mono">Searching for the best performance...</span>
+        <span className="text-sm text-[oklch(0.72_0.015_265)] font-mono">Searching for the best performance...</span>
       </div>
     );
   }
 
   if (error || !video) {
     return (
-      <div className="nocturne-card p-8 flex items-center gap-3 text-[oklch(0.50_0.012_265)]">
+      <div className="nocturne-card p-8 flex items-center gap-3 text-[oklch(0.68_0.012_265)]">
         <AlertCircle size={16} />
         <span className="text-sm font-mono">No performance video found. <a href={`https://www.youtube.com/results?search_query=${encodeURIComponent(composer + " " + title + " piano")}`} target="_blank" rel="noopener noreferrer" className="text-[oklch(0.78_0.12_85)] hover:underline">Search YouTube manually →</a></span>
       </div>
@@ -230,7 +230,7 @@ function PerformanceVideoSection({ title, composer }: { title: string; composer:
                 <Play size={32} className="text-[oklch(0.78_0.12_85)] ml-1 group-hover:scale-110 transition-transform" fill="currentColor" />
               </button>
               <p className="font-['Playfair_Display'] text-lg text-[oklch(0.88_0.01_85)] text-center px-8 max-w-2xl leading-snug">{video.title}</p>
-              <p className="text-sm text-[oklch(0.55_0.015_265)] mt-1 font-mono">{video.channelTitle}</p>
+              <p className="text-sm text-[oklch(0.72_0.015_265)] mt-1 font-mono">{video.channelTitle}</p>
             </div>
           </>
         ) : (
@@ -248,7 +248,7 @@ function PerformanceVideoSection({ title, composer }: { title: string; composer:
       <div className="nocturne-card p-4 flex flex-wrap items-start justify-between gap-4">
         <div className="flex-1 min-w-0">
           <p className="font-['Playfair_Display'] font-semibold text-[oklch(0.88_0.01_85)] leading-snug mb-1 truncate">{video.title}</p>
-          <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs font-mono text-[oklch(0.50_0.012_265)]">
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs font-mono text-[oklch(0.68_0.012_265)]">
             {video.channelTitle && <span className="flex items-center gap-1"><User size={10} />{video.channelTitle}</span>}
             {video.viewCountText && <span className="flex items-center gap-1"><Eye size={10} />{video.viewCountText} views</span>}
             {video.lengthText && <span className="flex items-center gap-1"><Clock size={10} />{video.lengthText}</span>}
@@ -288,7 +288,7 @@ function DayCard({ day, focus, goal, completed, onToggle, dateLabel }: {
         <button onClick={() => setOpen(!open)}
           className="flex-1 flex items-center gap-3 px-3 py-4 text-left hover:bg-[oklch(0.20_0.014_265)] transition-colors">
           <div className="flex flex-col items-start w-16 shrink-0">
-            <span className={`font-mono text-xs ${completed ? "text-[oklch(0.78_0.12_85)]" : "text-[oklch(0.50_0.012_265)]"}`}>D{day}</span>
+            <span className={`font-mono text-xs ${completed ? "text-[oklch(0.78_0.12_85)]" : "text-[oklch(0.68_0.012_265)]"}`}>D{day}</span>
             {dateLabel && (
               <span className="font-mono text-[0.55rem] text-[oklch(0.45_0.08_85)] leading-none mt-0.5">{dateLabel}</span>
             )}
@@ -479,7 +479,7 @@ export default function CompositionDetail() {
                 style={{ animation: `bounce 1.2s ease-in-out ${i * 0.2}s infinite` }} />
             ))}
           </div>
-          <button onClick={() => navigate("/")} className="mt-8 text-sm text-[oklch(0.50_0.012_265)] hover:text-[oklch(0.78_0.12_85)] transition-colors">
+          <button onClick={() => navigate("/")} className="mt-8 text-sm text-[oklch(0.68_0.012_265)] hover:text-[oklch(0.78_0.12_85)] transition-colors">
             ← Back to library
           </button>
         </div>
@@ -506,7 +506,7 @@ export default function CompositionDetail() {
   if (!analysis || !framework) {
     return (
       <div className="min-h-screen bg-[oklch(0.12_0.018_265)] flex items-center justify-center">
-        <p className="text-[oklch(0.55_0.015_265)]">Composition not found.</p>
+        <p className="text-[oklch(0.72_0.015_265)]">Composition not found.</p>
       </div>
     );
   }
@@ -521,7 +521,7 @@ export default function CompositionDetail() {
         <div className="relative z-10 max-w-5xl mx-auto px-6 pb-12 pt-8 w-full">
           {/* Back nav */}
           <button onClick={() => navigate("/")}
-            className="flex items-center gap-2 text-sm text-[oklch(0.55_0.015_265)] hover:text-[oklch(0.78_0.12_85)] transition-colors mb-8">
+            className="flex items-center gap-2 text-sm text-[oklch(0.72_0.015_265)] hover:text-[oklch(0.78_0.12_85)] transition-colors mb-8">
             <ChevronLeft size={16} /> Back to Library
           </button>
           <p className="font-mono text-[0.65rem] text-[oklch(0.78_0.12_85)] uppercase tracking-[0.25em] mb-3">
@@ -542,7 +542,7 @@ export default function CompositionDetail() {
                 className={`ml-auto flex items-center gap-2 px-4 py-1.5 rounded-full text-xs font-mono border transition-all duration-200 ${
                   splitScreen
                     ? "bg-[oklch(0.78_0.12_85/0.15)] border-[oklch(0.78_0.12_85/0.6)] text-[oklch(0.78_0.12_85)]"
-                    : "border-[oklch(0.30_0.018_265)] text-[oklch(0.55_0.015_265)] hover:border-[oklch(0.78_0.12_85/0.5)] hover:text-[oklch(0.78_0.12_85)]"
+                    : "border-[oklch(0.30_0.018_265)] text-[oklch(0.72_0.015_265)] hover:border-[oklch(0.78_0.12_85/0.5)] hover:text-[oklch(0.78_0.12_85)]"
                 }`}
               >
                 {splitScreen ? <PanelLeftClose size={13} /> : <Columns2 size={13} />}
@@ -562,13 +562,13 @@ export default function CompositionDetail() {
               <img src={LOGO_TREBLE} alt="" className="h-5 w-auto" />
               <span className="font-['Playfair_Display'] text-sm text-[oklch(0.78_0.12_85)]">{analysis.title}</span>
               <span className="text-[oklch(0.35_0.014_265)] text-xs font-mono">·</span>
-              <span className="text-[oklch(0.50_0.012_265)] text-xs font-mono">Split Practice Mode</span>
+              <span className="text-[oklch(0.68_0.012_265)] text-xs font-mono">Split Practice Mode</span>
             </div>
             <div className="flex items-center gap-3">
               <span className="font-mono text-xs text-[oklch(0.78_0.12_85)]">{overallPct}% complete</span>
               <button
                 onClick={() => setSplitScreen(false)}
-                className="flex items-center gap-2 px-3 py-1.5 rounded text-xs font-mono border border-[oklch(0.30_0.018_265)] text-[oklch(0.55_0.015_265)] hover:border-[oklch(0.78_0.12_85/0.5)] hover:text-[oklch(0.78_0.12_85)] transition-all"
+                className="flex items-center gap-2 px-3 py-1.5 rounded text-xs font-mono border border-[oklch(0.30_0.018_265)] text-[oklch(0.72_0.015_265)] hover:border-[oklch(0.78_0.12_85/0.5)] hover:text-[oklch(0.78_0.12_85)] transition-all"
               >
                 <PanelLeftClose size={12} /> Exit Split
               </button>
@@ -600,7 +600,7 @@ export default function CompositionDetail() {
                 {/* Mini header */}
                 <div className="flex items-center justify-between mb-5">
                   <div>
-                    <p className="font-mono text-[0.6rem] text-[oklch(0.50_0.012_265)] uppercase tracking-widest mb-0.5">Practice Tracker</p>
+                    <p className="font-mono text-[0.6rem] text-[oklch(0.68_0.012_265)] uppercase tracking-widest mb-0.5">Practice Tracker</p>
                     <h3 className="font-['Playfair_Display'] font-semibold text-lg text-[oklch(0.88_0.01_85)]">30-Day Plan</h3>
                   </div>
                   <div className="flex items-center gap-3">
@@ -660,7 +660,7 @@ export default function CompositionDetail() {
                       <div className="flex items-center gap-2 mb-2">
                         <div className="w-1.5 h-4 rounded-full" style={{ background: `oklch(${colorL} 0.10 85)` }} />
                         <span className="font-mono text-[0.6rem] text-[oklch(0.78_0.12_85)] uppercase tracking-widest">Week {week.week}</span>
-                        <span className="font-mono text-[0.6rem] text-[oklch(0.45_0.012_265)]">{week.title}</span>
+                        <span className="font-mono text-[0.6rem] text-[oklch(0.68_0.012_265)]">{week.title}</span>
                       </div>
                       <div className="grid gap-1.5">
                         {week.days.map((d: any) => (
@@ -697,7 +697,7 @@ export default function CompositionDetail() {
 
           {/* Progress ring */}
           <div className="mt-8 pt-6 border-t border-[oklch(0.24_0.016_265)]">
-            <p className="font-mono text-[0.6rem] text-[oklch(0.50_0.012_265)] uppercase tracking-widest mb-4">Your Progress</p>
+            <p className="font-mono text-[0.6rem] text-[oklch(0.68_0.012_265)] uppercase tracking-widest mb-4">Your Progress</p>
             <div className="flex justify-center mb-2">
               <ProgressRing done={totalDone} total={totalDays} />
             </div>
@@ -769,7 +769,7 @@ export default function CompositionDetail() {
                       <span className="text-2xl text-[oklch(0.78_0.12_85)] font-['Playfair_Display'] font-bold w-8 shrink-0">{c.icon}</span>
                       <div>
                         <h3 className="font-['Playfair_Display'] font-semibold text-xl text-[oklch(0.88_0.01_85)] mb-1">{c.title}</h3>
-                        <p className="font-mono text-xs text-[oklch(0.50_0.012_265)]">{c.location}</p>
+                        <p className="font-mono text-xs text-[oklch(0.68_0.012_265)]">{c.location}</p>
                       </div>
                     </div>
                     <p className="text-sm text-[oklch(0.65_0.015_265)] leading-relaxed mb-4">{c.description}</p>
@@ -862,7 +862,7 @@ export default function CompositionDetail() {
               <div className="nocturne-card p-6 mb-12 border-[oklch(0.78_0.12_85/0.2)]">
                 <div className="flex items-start justify-between mb-5 gap-4 flex-wrap">
                   <div>
-                    <p className="font-mono text-[0.6rem] text-[oklch(0.50_0.012_265)] uppercase tracking-widest mb-1">Practice Tracker</p>
+                    <p className="font-mono text-[0.6rem] text-[oklch(0.68_0.012_265)] uppercase tracking-widest mb-1">Practice Tracker</p>
                     <h3 className="font-['Playfair_Display'] font-semibold text-xl text-[oklch(0.88_0.01_85)]">Your 30-Day Progress</h3>
                     {/* Start-date picker */}
                     <div className="mt-3 flex items-center gap-2">
@@ -903,7 +903,7 @@ export default function CompositionDetail() {
                   </div>
                   <div className="text-right">
                     <p className="font-mono text-3xl font-bold text-[oklch(0.78_0.12_85)]">{overallPct}%</p>
-                    <p className="font-mono text-xs text-[oklch(0.50_0.012_265)]">{totalDone} of {totalDays} days</p>
+                    <p className="font-mono text-xs text-[oklch(0.68_0.012_265)]">{totalDone} of {totalDays} days</p>
                   </div>
                 </div>
                 <div className="w-full h-3 rounded-full bg-[oklch(0.22_0.014_265)] overflow-hidden mb-5">
@@ -933,13 +933,13 @@ export default function CompositionDetail() {
                     const colorL = 0.78 - wi * 0.06;
                     return (
                       <div key={week.week} className="bg-[oklch(0.14_0.016_265)] rounded-lg p-3">
-                        <p className="font-mono text-[0.6rem] text-[oklch(0.50_0.012_265)] uppercase tracking-widest mb-0.5">Week {week.week}</p>
+                        <p className="font-mono text-[0.6rem] text-[oklch(0.68_0.012_265)] uppercase tracking-widest mb-0.5">Week {week.week}</p>
                         <p className="font-['Playfair_Display'] text-sm font-semibold text-[oklch(0.82_0.01_85)] leading-tight mb-1">{week.title}</p>
                         <div className="flex items-center gap-3 mt-2">
                           <div className="flex-1 h-1.5 rounded-full bg-[oklch(0.22_0.014_265)] overflow-hidden">
                             <div className="h-full rounded-full transition-all duration-500" style={{ width: `${pct}%`, background: `oklch(${colorL} 0.10 85)` }} />
                           </div>
-                          <span className="font-mono text-[0.65rem] text-[oklch(0.50_0.012_265)]">{weekDone}/{week.days.length}</span>
+                          <span className="font-mono text-[0.65rem] text-[oklch(0.68_0.012_265)]">{weekDone}/{week.days.length}</span>
                         </div>
                       </div>
                     );
@@ -983,7 +983,7 @@ export default function CompositionDetail() {
                         <div className={`w-12 h-12 rounded-full border-2 flex items-center justify-center mb-4 z-10 transition-all duration-500 ${reached ? "border-[oklch(0.78_0.12_85)] bg-[oklch(0.78_0.12_85/0.15)]" : "border-[oklch(0.35_0.014_265)] bg-[oklch(0.17_0.016_265)]"}`}>
                           {reached ? <CheckCircle2 size={20} className="text-[oklch(0.78_0.12_85)]" /> : <span className="font-mono text-[oklch(0.40_0.012_265)] text-xs font-bold">{i + 1}</span>}
                         </div>
-                        <p className={`font-mono text-xs font-bold mb-1 ${reached ? "text-[oklch(0.78_0.12_85)]" : "text-[oklch(0.50_0.012_265)]"}`}>{m.date}</p>
+                        <p className={`font-mono text-xs font-bold mb-1 ${reached ? "text-[oklch(0.78_0.12_85)]" : "text-[oklch(0.68_0.012_265)]"}`}>{m.date}</p>
                         <p className="text-[oklch(0.82_0.01_85)] text-sm font-semibold mb-1 leading-snug">{m.label}</p>
                         <p className="text-[oklch(0.48_0.012_265)] text-xs leading-relaxed">{m.benchmark}</p>
                       </div>
@@ -1005,7 +1005,7 @@ export default function CompositionDetail() {
                           <span className="font-mono text-[0.65rem] text-[oklch(0.78_0.12_85)] uppercase tracking-[0.2em]">
                             Week {week.week} · Days {week.days[0]?.day}–{week.days[week.days.length - 1]?.day}
                           </span>
-                          <span className="font-mono text-[0.65rem] text-[oklch(0.50_0.012_265)]">{weekDone}/{week.days.length} complete</span>
+                          <span className="font-mono text-[0.65rem] text-[oklch(0.68_0.012_265)]">{weekDone}/{week.days.length} complete</span>
                         </div>
                         <h3 className="font-['Playfair_Display'] font-bold text-xl text-[oklch(0.90_0.01_85)] mb-2">{week.title}</h3>
                         <p className="text-[oklch(0.60_0.015_265)] text-sm leading-relaxed mb-2">{week.goal}</p>
@@ -1056,7 +1056,7 @@ export default function CompositionDetail() {
                     <p className="text-xs text-[oklch(0.40_0.012_265)]">{analysis.composer} · {analysis.key}</p>
                   </div>
                 </div>
-                <button onClick={() => navigate("/")} className="text-sm text-[oklch(0.50_0.012_265)] hover:text-[oklch(0.78_0.12_85)] transition-colors">
+                <button onClick={() => navigate("/")} className="text-sm text-[oklch(0.68_0.012_265)] hover:text-[oklch(0.78_0.12_85)] transition-colors">
                   ← Back to Library
                 </button>
               </div>
