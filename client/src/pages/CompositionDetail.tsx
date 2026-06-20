@@ -8,11 +8,12 @@ import { useParams, useLocation } from "wouter";
 import { trpc } from "@/lib/trpc";
 import {
   ChevronDown, ChevronUp, ChevronLeft, Music, BookOpen, Dumbbell, Calendar,
-  Info, CheckCircle2, Circle, RotateCcw, Loader2, AlertCircle, Youtube, CalendarDays, X
+  Info, CheckCircle2, Circle, RotateCcw, Loader2, AlertCircle, Youtube, CalendarDays, X, FileMusic
 } from "lucide-react";
 import { Calendar as CalendarPicker } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { format, addDays } from "date-fns";
+import ScoreViewer from "@/components/ScoreViewer";
 
 const LOGO_TREBLE = "https://d2xsxph8kpxj0f.cloudfront.net/310519663449376037/iyZgf5CgymBq6EtTfh66yp/logo_treble-Ys7HU4Ydwkc3JS4KPHV5db.webp";
 const HERO_BG = "https://d2xsxph8kpxj0f.cloudfront.net/310519663449376037/iyZgf5CgymBq6EtTfh66yp/hero_bg-DDCWpXMzKGFmMUM3oU8SpS.webp";
@@ -342,7 +343,10 @@ export default function CompositionDetail() {
     setActiveSection(id);
   };
 
+  const hasScore = !isBuiltIn && !!composition?.fileUrl;
+
   const NAV_ITEMS = [
+    ...(hasScore ? [{ id: "score", label: "View Score", icon: FileMusic }] : []),
     { id: "history", label: "Historical Context", icon: BookOpen },
     { id: "technical", label: "Technical Evaluation", icon: Music },
     { id: "hanon", label: "Hanon Exercises", icon: Dumbbell },
@@ -477,6 +481,32 @@ export default function CompositionDetail() {
         {/* Main content */}
         <main className="flex-1 min-w-0">
           <div className="max-w-4xl mx-auto px-6 lg:px-12 py-20 space-y-0">
+
+            {/* ── SCORE VIEWER ───────────────────────────────────────────── */}
+            {hasScore && composition?.fileUrl && (
+              <>
+                <section id="score" className="pb-2">
+                  <div className="flex items-center gap-4 mb-6">
+                    <span className="text-[oklch(0.78_0.12_85)] text-xl select-none">♪</span>
+                    <div className="flex-1 h-px bg-gradient-to-r from-[oklch(0.78_0.12_85/0.6)] to-transparent" />
+                    <span className="font-mono text-[0.6rem] text-[oklch(0.78_0.12_85)] uppercase tracking-[0.25em]">Score</span>
+                    <div className="flex-1 h-px bg-gradient-to-l from-[oklch(0.78_0.12_85/0.6)] to-transparent" />
+                    <span className="text-[oklch(0.78_0.12_85)] text-xl select-none">♪</span>
+                  </div>
+                  <h2 className="font-['Playfair_Display'] font-bold text-4xl sm:text-5xl text-[oklch(0.92_0.01_85)] mb-4">Your Score</h2>
+                  <p className="text-[oklch(0.60_0.015_265)] text-sm mb-8">
+                    Read the score directly in the app. Use the toolbar to zoom, navigate pages, rotate, or download.
+                    Click the fullscreen button for an immersive practice view.
+                  </p>
+                  <ScoreViewer
+                    fileUrl={composition.fileUrl}
+                    mimeType={composition.mimeType ?? "application/pdf"}
+                    title={analysis?.title ?? composition.title}
+                  />
+                </section>
+                <GoldRule />
+              </>
+            )}
 
             {/* ── HISTORICAL CONTEXT ─────────────────────────────────────── */}
             <section id="history">
