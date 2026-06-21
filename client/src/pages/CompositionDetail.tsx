@@ -558,7 +558,7 @@ function PerformanceVideoSection({
                     }`}
                 >
                   {/* Thumbnail */}
-                  <div className="relative shrink-0 w-24 aspect-video rounded-lg overflow-hidden bg-[oklch(0.10_0.016_265)]">
+                  <div className="relative shrink-0 w-20 sm:w-24 aspect-video rounded-lg overflow-hidden bg-[oklch(0.10_0.016_265)]">
                     {v.thumbnailUrl && (
                       <img src={v.thumbnailUrl} alt="" className="w-full h-full object-cover" />
                     )}
@@ -882,20 +882,20 @@ export default function CompositionDetail() {
       <header className="relative overflow-hidden min-h-[50vh] flex flex-col justify-end">
         <div className="absolute inset-0 bg-cover bg-center opacity-25" style={{ backgroundImage: `url(${HERO_BG})` }} />
         <div className="absolute inset-0 bg-gradient-to-b from-[oklch(0.12_0.018_265/0.4)] to-[oklch(0.12_0.018_265)]" />
-        <div className="relative z-10 max-w-5xl mx-auto px-6 pb-12 pt-8 w-full">
+        <div className="relative z-10 max-w-5xl mx-auto px-4 sm:px-6 pb-8 sm:pb-12 pt-6 sm:pt-8 w-full">
           {/* Back nav */}
           <button onClick={() => navigate("/")}
             className="flex items-center gap-2 text-sm text-[oklch(0.72_0.015_265)] hover:text-[oklch(0.78_0.12_85)] transition-colors mb-8">
             <ChevronLeft size={16} /> Back to Library
           </button>
-          <p className="font-mono text-[0.65rem] text-[oklch(0.78_0.12_85)] uppercase tracking-[0.25em] mb-3">
+          <p className="font-mono text-[0.6rem] sm:text-[0.65rem] text-[oklch(0.78_0.12_85)] uppercase tracking-[0.15em] sm:tracking-[0.25em] mb-2 sm:mb-3 break-words">
             {analysis.composer} · {analysis.key} · {analysis.tempo}
           </p>
-          <h1 className="font-['Playfair_Display'] font-black text-5xl sm:text-6xl text-[oklch(0.92_0.01_85)] mb-4">
+          <h1 className="font-['Playfair_Display'] font-black text-3xl sm:text-5xl text-[oklch(0.92_0.01_85)] mb-3 sm:mb-4 leading-tight">
             {analysis.title}
           </h1>
-          <p className="text-[oklch(0.65_0.015_265)] text-lg max-w-2xl leading-relaxed">{analysis.overview}</p>
-          <div className="flex flex-wrap items-center gap-3 mt-6">
+          <p className="text-[oklch(0.65_0.015_265)] text-sm sm:text-lg max-w-2xl leading-relaxed">{analysis.overview}</p>
+          <div className="flex flex-wrap items-center gap-2 sm:gap-3 mt-4 sm:mt-6">
             {[analysis.difficulty, analysis.key, analysis.estimatedDuration].filter(Boolean).map((tag: string) => (
               <span key={tag} className="text-xs font-mono text-[oklch(0.60_0.012_265)] border border-[oklch(0.28_0.018_265)] rounded-full px-3 py-1">{tag}</span>
             ))}
@@ -1094,7 +1094,7 @@ export default function CompositionDetail() {
 
         {/* Main content */}
         <main className="flex-1 min-w-0">
-          <div className="max-w-4xl mx-auto px-6 lg:px-12 py-20 space-y-0">
+          <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-12 py-8 sm:py-20 space-y-0">
 
             {/* ── SCORE VIEWER ───────────────────────────────────────────── */}
             {hasScore && scoreUrl && (
@@ -1326,7 +1326,7 @@ export default function CompositionDetail() {
                     style={{ width: `${overallPct}%`, background: "linear-gradient(to right, oklch(0.60 0.08 85), oklch(0.78 0.12 85))" }} />
                 </div>
                 {/* Day grid */}
-                <div className="grid grid-cols-10 gap-1.5 mb-5">
+                <div className="grid grid-cols-6 sm:grid-cols-10 gap-1.5 mb-5">
                   {allDays.map((day: number) => {
                     const done = completed.has(day);
                     const weekIdx = (framework.weeks ?? []).findIndex((w: any) => w.days.some((d: any) => d.day === day));
@@ -1341,7 +1341,7 @@ export default function CompositionDetail() {
                   })}
                 </div>
                 {/* Week bars */}
-                <div className="grid sm:grid-cols-4 gap-4">
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
                   {(framework.weeks ?? []).map((week: any, wi: number) => {
                     const weekDone = week.days.filter((d: any) => completed.has(d.day)).length;
                     const pct = week.days.length > 0 ? (weekDone / week.days.length) * 100 : 0;
@@ -1389,7 +1389,7 @@ export default function CompositionDetail() {
               <h3 className="font-['Playfair_Display'] font-semibold text-2xl text-[oklch(0.88_0.01_85)] mb-6">Milestone Summary</h3>
               <div className="relative mb-14">
                 <div className="hidden sm:block absolute top-6 left-0 right-0 h-px bg-gradient-to-r from-transparent via-[oklch(0.78_0.12_85/0.35)] to-transparent" />
-                <div className="grid sm:grid-cols-4 gap-6">
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 sm:gap-6">
                   {(framework.milestones ?? []).map((m: any, i: number) => {
                     const milestoneDay = [7, 14, 21, 30][i];
                     const reached = milestoneDay !== undefined && completed.has(milestoneDay);
@@ -1684,8 +1684,8 @@ export default function CompositionDetail() {
       <div
         style={{
           position: "fixed",
-          bottom: "1.5rem",
-          right: "1.5rem",
+          bottom: "1rem",
+          right: "1rem",
           zIndex: 50,
           display: "flex",
           flexDirection: "column",
@@ -1702,7 +1702,7 @@ export default function CompositionDetail() {
               borderRadius: "1rem",
               padding: "1.25rem",
               boxShadow: "0 8px 40px oklch(0 0 0 / 0.6), 0 0 0 1px oklch(0.78 0.12 85 / 0.10)",
-              width: "280px",
+              width: "min(280px, calc(100vw - 3rem))",
               animation: "fadeInUp 180ms cubic-bezier(0.23,1,0.32,1)",
             }}
           >

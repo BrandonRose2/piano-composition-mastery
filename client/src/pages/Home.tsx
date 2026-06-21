@@ -422,28 +422,28 @@ function SheetMusicSearch() {
 function NavBar() {
   const { user, logout } = useAuth();
   return (
-    <nav className="flex items-center justify-between mb-16">
+    <nav className="flex items-center justify-between mb-10 sm:mb-16 gap-2">
       <div className="flex items-center gap-3">
         <img src={LOGO_TREBLE} alt="Treble clef" className="h-9 w-auto" />
-        <span className="font-['Playfair_Display'] font-semibold text-[oklch(0.78_0.12_85)] text-sm tracking-wide">
+        <span className="font-['Playfair_Display'] font-semibold text-[oklch(0.78_0.12_85)] text-xs sm:text-sm tracking-wide hidden xs:inline">
           Piano Mastery Portal
         </span>
       </div>
       {user && (
         <div className="flex items-center gap-3">
-          <div className="flex items-center gap-2 text-xs font-mono text-[oklch(0.68_0.012_265)]">
+          <div className="hidden sm:flex items-center gap-2 text-xs font-mono text-[oklch(0.68_0.012_265)]">
             <User size={12} className="text-[oklch(0.78_0.12_85)]" />
-            <span className="hidden sm:inline">{user.username ?? user.name ?? user.email ?? "Pianist"}</span>
+            <span>{user.username ?? user.name ?? user.email ?? "Pianist"}</span>
           </div>
           <button
             onClick={() => logout()}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-mono
+            className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-mono
               text-[oklch(0.68_0.012_265)] border border-[oklch(0.22_0.016_265)]
               hover:text-[oklch(0.70_0.012_265)] hover:border-[oklch(0.35_0.016_265)]
               transition-all duration-150 active:scale-95"
             title="Sign out"
           >
-            <LogOut size={11} /> Sign out
+            <LogOut size={11} /><span className="hidden sm:inline ml-1">Sign out</span>
           </button>
         </div>
       )}
@@ -533,7 +533,7 @@ function UploadZone({ onUpload }: { onUpload: (file: File) => void }) {
       onDragLeave={() => setDragging(false)}
       onDrop={handleDrop}
       onClick={() => inputRef.current?.click()}
-      className={`relative cursor-pointer rounded-2xl border-2 border-dashed transition-all duration-300 p-12 text-center group
+        className={`relative cursor-pointer rounded-2xl border-2 border-dashed transition-all duration-300 p-6 sm:p-12 text-center group
         ${dragging
           ? "border-[oklch(0.78_0.12_85)] bg-[oklch(0.78_0.12_85/0.06)] scale-[1.01]"
           : "border-[oklch(0.30_0.018_265)] hover:border-[oklch(0.55_0.08_85)] hover:bg-[oklch(0.78_0.12_85/0.03)]"
@@ -552,31 +552,31 @@ function UploadZone({ onUpload }: { onUpload: (file: File) => void }) {
         <div className="absolute inset-0 rounded-2xl bg-[oklch(0.78_0.12_85/0.04)] pointer-events-none" />
       )}
 
-      <div className="flex flex-col items-center gap-5">
-        <div className={`w-20 h-20 rounded-full border-2 flex items-center justify-center transition-all duration-300
+          <div className="flex flex-col items-center gap-3 sm:gap-5">
+          <div className={`w-14 h-14 sm:w-20 sm:h-20 rounded-full border-2 flex items-center justify-center transition-all duration-300
           ${dragging
             ? "border-[oklch(0.78_0.12_85)] bg-[oklch(0.78_0.12_85/0.12)]"
             : "border-[oklch(0.30_0.018_265)] group-hover:border-[oklch(0.55_0.08_85)] group-hover:bg-[oklch(0.78_0.12_85/0.06)]"
           }`}>
           <Upload
-            size={32}
+            size={24}
             className={`transition-colors duration-300 ${dragging ? "text-[oklch(0.78_0.12_85)]" : "text-[oklch(0.40_0.012_265)] group-hover:text-[oklch(0.65_0.08_85)]"}`}
           />
         </div>
 
-        <div>
-          <p className="font-['Playfair_Display'] text-xl font-semibold text-[oklch(0.88_0.01_85)] mb-2">
-            {dragging ? "Release to upload" : "Drop your piano score here"}
-          </p>
-          <p className="text-sm text-[oklch(0.72_0.015_265)] mb-1">
-            or <span className="text-[oklch(0.78_0.12_85)] underline underline-offset-2">click to browse</span>
-          </p>
-          <p className="text-xs text-[oklch(0.40_0.012_265)]">
-            Supports PDF, PNG, JPG, WEBP — any piano composition
-          </p>
-        </div>
+          <div>
+            <p className="font-['Playfair_Display'] text-base sm:text-xl font-semibold text-[oklch(0.88_0.01_85)] mb-1.5 sm:mb-2">
+              {dragging ? "Release to upload" : "Drop your piano score here"}
+            </p>
+            <p className="text-sm text-[oklch(0.72_0.015_265)] mb-1">
+              or <span className="text-[oklch(0.78_0.12_85)] underline underline-offset-2">click to browse</span>
+            </p>
+            <p className="text-xs text-[oklch(0.40_0.012_265)]">
+              PDF, PNG, JPG, WEBP
+            </p>
+          </div>
 
-        <div className="flex flex-wrap justify-center gap-2 mt-2">
+        <div className="hidden sm:flex flex-wrap justify-center gap-2 mt-2">
           {["Beethoven Sonatas", "Chopin Études", "Bach Inventions", "Mozart Variations", "Schubert Impromptus"].map((ex) => (
             <span key={ex} className="text-[0.65rem] font-mono text-[oklch(0.65_0.010_265)] border border-[oklch(0.24_0.016_265)] rounded-full px-2.5 py-1">
               {ex}
@@ -883,7 +883,7 @@ export default function Home() {
         />
         <div className="absolute inset-0 bg-gradient-to-b from-[oklch(0.12_0.018_265/0.6)] to-[oklch(0.12_0.018_265)]" />
 
-        <div className="relative z-10 max-w-5xl mx-auto px-6 py-16 sm:py-24">
+        <div className="relative z-10 max-w-5xl mx-auto px-4 sm:px-6 py-10 sm:py-24">
           {/* Nav */}
           <NavBar />
 
@@ -892,12 +892,12 @@ export default function Home() {
             <p className="font-mono text-[0.65rem] text-[oklch(0.78_0.12_85)] uppercase tracking-[0.25em] mb-4">
               AI-Powered Practice Framework Generator
             </p>
-            <h1 className="font-['Playfair_Display'] font-black text-5xl sm:text-6xl lg:text-7xl leading-none mb-6">
+            <h1 className="font-['Playfair_Display'] font-black text-3xl sm:text-5xl lg:text-7xl leading-tight sm:leading-none mb-4 sm:mb-6">
               <span className="text-[oklch(0.92_0.01_85)]">Master Any</span>
               <br />
               <span className="text-[oklch(0.78_0.12_85)] italic">Piano Composition</span>
             </h1>
-            <p className="text-[oklch(0.65_0.015_265)] text-lg max-w-xl leading-relaxed">
+            <p className="text-[oklch(0.65_0.015_265)] text-sm sm:text-lg max-w-xl leading-relaxed">
               Upload any piano score — PDF or image — and receive a complete technical analysis, targeted Hanon exercise mapping, and a personalized 30-day practice framework generated by AI.
             </p>
           </div>
@@ -905,7 +905,7 @@ export default function Home() {
       </header>
 
       {/* ── MAIN CONTENT ──────────────────────────────────────────────────── */}
-      <main className="max-w-5xl mx-auto px-6 pb-24">
+      <main className="max-w-5xl mx-auto px-4 sm:px-6 pb-24">
 
         {/* How it works */}
         <div className="grid sm:grid-cols-3 gap-4 mb-16">
@@ -990,7 +990,7 @@ export default function Home() {
 
       {/* ── FOOTER ────────────────────────────────────────────────────────── */}
       <footer className="border-t border-[oklch(0.20_0.014_265)] py-8">
-        <div className="max-w-5xl mx-auto px-6 flex items-center justify-between">
+        <div className="max-w-5xl mx-auto px-4 sm:px-6 flex flex-col sm:flex-row items-center gap-2 sm:justify-between">
           <div className="flex items-center gap-3">
             <img src={LOGO_TREBLE} alt="" className="h-6 w-auto" />
             <p className="text-xs text-[oklch(0.40_0.012_265)]">Piano Mastery Portal</p>
