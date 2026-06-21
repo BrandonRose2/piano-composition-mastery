@@ -132,29 +132,27 @@ export const appRouter = router({
   youtube: router({
     /** Search YouTube for the best performance video of a given piece */
     searchPerformance: publicProcedure
-      .input(z.object({ title: z.string(), composer: z.string() }))
+      .input(z.object({
+        title: z.string(),
+        composer: z.string(),
+        key: z.string().optional().default(""),
+        tempo: z.string().optional().default(""),
+        catalogue: z.string().optional().default(""),
+      }))
       .query(async ({ input }) => {
-        const query = `${input.composer} ${input.title} piano performance`;
+        // Build a specific query using all available metadata
+        const parts = [input.composer, input.title];
+        if (input.catalogue) parts.push(input.catalogue);
+        if (input.key) parts.push(input.key);
+        parts.push("piano performance");
+        const query = parts.filter(Boolean).join(" ");
+
         try {
           const result = await callDataApi("Youtube/search", {
             query: { q: query, gl: "US", hl: "en" },
           }) as any;
 
           const contents: any[] = result?.contents ?? [];
-
-          const videos = contents
-            .filter((c: any) => c?.type === "video" && c?.video?.videoId)
-            .map((c: any) => ({
-              videoId: c.video.videoId as string,
-              title: (c.video.title ?? "") as string,
-              channelTitle: (c.video.channelTitle ?? "") as string,
-              viewCountText: (c.video.viewCountText ?? "") as string,
-              lengthText: (c.video.lengthText ?? "") as string,
-              publishedTimeText: (c.video.publishedTimeText ?? "") as string,
-              thumbnailUrl: (c.video.thumbnails?.[0]?.url ?? "") as string,
-            }));
-
-          if (videos.length === 0) return null;
 
           const parseViews = (text: string): number => {
             if (!text) return 0;
@@ -167,14 +165,27 @@ export const appRouter = router({
             return num;
           };
 
-          const sorted = [...videos].sort(
-            (a, b) => parseViews(b.viewCountText) - parseViews(a.viewCountText)
-          );
+          const videos = contents
+            .filter((c: any) => c?.type === "video" && c?.video?.videoId)
+            .map((c: any) => ({
+              videoId: c.video.videoId as string,
+              title: (c.video.title ?? "") as string,
+              channelTitle: (c.video.channelTitle ?? "") as string,
+              viewCountText: (c.video.viewCountText ?? "") as string,
+              viewCount: parseViews(c.video.viewCountText ?? ""),
+              lengthText: (c.video.lengthText ?? "") as string,
+              publishedTimeText: (c.video.publishedTimeText ?? "") as string,
+              thumbnailUrl: (c.video.thumbnails?.[0]?.url ?? "") as string,
+            }));
 
-          return sorted[0] ?? null;
+          if (videos.length === 0) return [];
+
+          // Sort by views and return top 5
+          const sorted = [...videos].sort((a, b) => b.viewCount - a.viewCount);
+          return sorted.slice(0, 5);
         } catch (err) {
           console.error("[YouTube] Search failed:", err);
-          return null;
+          return [];
         }
       }),
   }),

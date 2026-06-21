@@ -182,45 +182,54 @@ function ProgressRing({ done, total }: { done: number; total: number }) {
 }
 
 // ── Performance Video Section ────────────────────────────────────────────────
-function PerformanceVideoSection({ title, composer }: { title: string; composer: string }) {
+function PerformanceVideoSection({
+  title, composer, musicKey = "", tempo = ""
+}: { title: string; composer: string; musicKey?: string; tempo?: string }) {
+  const [selectedIdx, setSelectedIdx] = useState(0);
   const [playing, setPlaying] = useState(false);
 
-  const { data: video, isLoading, error } = trpc.youtube.searchPerformance.useQuery(
-    { title, composer },
+  const { data: videos = [], isLoading, error } = trpc.youtube.searchPerformance.useQuery(
+    { title, composer, key: musicKey, tempo },
     { staleTime: 1000 * 60 * 60, retry: 1 }
   );
+
+  // Reset player when selection changes
+  const handleSelect = (idx: number) => {
+    if (idx === selectedIdx) return;
+    setSelectedIdx(idx);
+    setPlaying(false);
+  };
 
   if (isLoading) {
     return (
       <div className="nocturne-card p-8 flex items-center gap-4">
         <Loader2 size={20} className="animate-spin text-[oklch(0.78_0.12_85)]" />
-        <span className="text-sm text-[oklch(0.72_0.015_265)] font-mono">Searching for the best performance...</span>
+        <span className="text-sm text-[oklch(0.72_0.015_265)] font-mono">Searching for performances…</span>
       </div>
     );
   }
 
-  if (error || !video) {
+  if (error || videos.length === 0) {
     return (
       <div className="nocturne-card p-8 flex items-center gap-3 text-[oklch(0.68_0.012_265)]">
         <AlertCircle size={16} />
-        <span className="text-sm font-mono">No performance video found. <a href={`https://www.youtube.com/results?search_query=${encodeURIComponent(composer + " " + title + " piano")}`} target="_blank" rel="noopener noreferrer" className="text-[oklch(0.78_0.12_85)] hover:underline">Search YouTube manually →</a></span>
+        <span className="text-sm font-mono">No performance videos found. <a href={`https://www.youtube.com/results?search_query=${encodeURIComponent(composer + " " + title + " piano")}`} target="_blank" rel="noopener noreferrer" className="text-[oklch(0.78_0.12_85)] hover:underline">Search YouTube manually →</a></span>
       </div>
     );
   }
 
+  const video = videos[selectedIdx] ?? videos[0];
   const embedUrl = `https://www.youtube.com/embed/${video.videoId}?autoplay=1&rel=0&modestbranding=1`;
   const watchUrl = `https://www.youtube.com/watch?v=${video.videoId}`;
 
   return (
-    <div className="space-y-4">
-      {/* Video player */}
+    <div className="space-y-5">
+      {/* ── Active video player ─────────────────────────────────────────── */}
       <div className="relative w-full rounded-xl overflow-hidden border border-[oklch(0.24_0.016_265)] bg-[oklch(0.10_0.016_265)]" style={{ aspectRatio: "16/9" }}>
         {!playing ? (
-          // Thumbnail with play button overlay
           <>
             {video.thumbnailUrl && (
-              <img src={video.thumbnailUrl} alt={video.title}
-                className="w-full h-full object-cover opacity-70" />
+              <img src={video.thumbnailUrl} alt={video.title} className="w-full h-full object-cover opacity-70" />
             )}
             <div className="absolute inset-0 flex flex-col items-center justify-center bg-[oklch(0.08_0.016_265/0.6)]">
               <button
@@ -245,10 +254,10 @@ function PerformanceVideoSection({ title, composer }: { title: string; composer:
         )}
       </div>
 
-      {/* Video metadata card */}
+      {/* ── Active video metadata ───────────────────────────────────────── */}
       <div className="nocturne-card p-4 flex flex-wrap items-start justify-between gap-4">
         <div className="flex-1 min-w-0">
-          <p className="font-['Playfair_Display'] font-semibold text-[oklch(0.88_0.01_85)] leading-snug mb-1 truncate">{video.title}</p>
+          <p className="font-['Playfair_Display'] font-semibold text-[oklch(0.88_0.01_85)] leading-snug mb-1">{video.title}</p>
           <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs font-mono text-[oklch(0.68_0.012_265)]">
             {video.channelTitle && <span className="flex items-center gap-1"><User size={10} />{video.channelTitle}</span>}
             {video.viewCountText && <span className="flex items-center gap-1"><Eye size={10} />{video.viewCountText} views</span>}
@@ -268,6 +277,72 @@ function PerformanceVideoSection({ title, composer }: { title: string; composer:
           <Youtube size={13} /> Watch on YouTube
         </a>
       </div>
+
+      {/* ── Selectable video cards ──────────────────────────────────────── */}
+      {videos.length > 1 && (
+        <div>
+          <p className="text-xs font-mono text-[oklch(0.55_0.015_265)] uppercase tracking-widest mb-3">
+            {videos.length} performances found — select the correct one:
+          </p>
+          <div className="grid gap-2">
+            {videos.map((v, idx) => {
+              const isActive = idx === selectedIdx;
+              return (
+                <button
+                  key={v.videoId}
+                  onClick={() => handleSelect(idx)}
+                  className={`w-full flex items-start gap-3 p-3 rounded-xl border text-left transition-all duration-150
+                    ${
+                      isActive
+                        ? "border-[oklch(0.78_0.12_85/0.6)] bg-[oklch(0.78_0.12_85/0.07)] ring-1 ring-[oklch(0.78_0.12_85/0.25)]"
+                        : "border-[oklch(0.24_0.016_265)] bg-[oklch(0.14_0.018_265)] hover:border-[oklch(0.40_0.06_85/0.5)] hover:bg-[oklch(0.17_0.016_265)]"
+                    }`}
+                >
+                  {/* Thumbnail */}
+                  <div className="relative shrink-0 w-24 aspect-video rounded-lg overflow-hidden bg-[oklch(0.10_0.016_265)]">
+                    {v.thumbnailUrl && (
+                      <img src={v.thumbnailUrl} alt="" className="w-full h-full object-cover" />
+                    )}
+                    {isActive && (
+                      <div className="absolute inset-0 flex items-center justify-center bg-[oklch(0.08_0.016_265/0.55)]">
+                        <div className="w-6 h-6 rounded-full bg-[oklch(0.78_0.12_85)] flex items-center justify-center">
+                          <Play size={10} fill="currentColor" className="text-[oklch(0.12_0.018_265)] ml-0.5" />
+                        </div>
+                      </div>
+                    )}
+                    {v.lengthText && (
+                      <span className="absolute bottom-1 right-1 text-[0.55rem] font-mono bg-black/70 text-white px-1 rounded">
+                        {v.lengthText}
+                      </span>
+                    )}
+                  </div>
+
+                  {/* Info */}
+                  <div className="flex-1 min-w-0">
+                    <p className={`text-sm font-semibold leading-snug mb-1 line-clamp-2 ${
+                      isActive ? "text-[oklch(0.88_0.01_85)]" : "text-[oklch(0.78_0.015_265)]"
+                    }`}>{v.title}</p>
+                    <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 text-[0.65rem] font-mono text-[oklch(0.55_0.012_265)]">
+                      {v.channelTitle && <span className="flex items-center gap-1"><User size={9} />{v.channelTitle}</span>}
+                      {v.viewCountText && <span className="flex items-center gap-1"><Eye size={9} />{v.viewCountText}</span>}
+                      {v.publishedTimeText && <span>{v.publishedTimeText}</span>}
+                    </div>
+                  </div>
+
+                  {/* Rank badge */}
+                  <div className={`shrink-0 w-6 h-6 rounded-full flex items-center justify-center text-[0.6rem] font-mono font-bold ${
+                    isActive
+                      ? "bg-[oklch(0.78_0.12_85)] text-[oklch(0.12_0.018_265)]"
+                      : "bg-[oklch(0.22_0.014_265)] text-[oklch(0.55_0.012_265)]"
+                  }`}>
+                    {idx + 1}
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -847,7 +922,12 @@ export default function CompositionDetail() {
                 is an essential part of learning — absorb the phrasing, dynamics, and musical character before
                 your fingers learn the notes.
               </p>
-              <PerformanceVideoSection title={analysis.title} composer={analysis.composer} />
+              <PerformanceVideoSection
+                title={analysis.title}
+                composer={analysis.composer}
+                musicKey={analysis.key ?? ""}
+                tempo={analysis.tempo ?? ""}
+              />
             </section>
 
             <GoldRule />
