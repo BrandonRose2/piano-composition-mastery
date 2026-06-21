@@ -11,10 +11,15 @@ import {
   deleteComposition,
   getProgressForComposition,
   toggleDayProgress,
+  getDb,
 } from "./db";
 import { storagePut } from "./storage";
 import { analyzeComposition } from "./analyzeComposition";
 import { callDataApi } from "./_core/dataApi";
+import { sdk } from "./_core/sdk";
+import * as bcrypt from "bcryptjs";
+import { users } from "../drizzle/schema";
+import { eq } from "drizzle-orm";
 
 export const appRouter = router({
   system: systemRouter,
@@ -317,6 +322,116 @@ export const appRouter = router({
         }, 0);
 
         return { id: composition.id, title };
+      }),
+  }),
+
+  localAuth: router({
+    /**
+     * Register a new account with username + password (no email required).
+     * Returns a session cookie on success.
+     */
+    register: publicProcedure
+      .input(
+        z.object({
+          username: z
+            .string()
+            .min(3, "Username must be at least 3 characters")
+            .max(32, "Username must be 32 characters or fewer")
+            .regex(/^[a-zA-Z0-9_-]+$/, "Username may only contain letters, numbers, _ and -"),
+          password: z
+            .string()
+            .min(6, "Password must be at least 6 characters")
+            .max(128),
+        })
+      )
+      .mutation(async ({ input, ctx }) => {
+        const db = await getDb();
+        if (!db) throw new Error("Database unavailable");
+
+        // Check username is not taken
+        const existing = await db
+          .select({ id: users.id })
+          .from(users)
+          .where(eq(users.username, input.username))
+          .limit(1);
+        if (existing.length > 0) {
+          throw new Error("Username is already taken");
+        }
+
+        const passwordHash = await bcrypt.hash(input.password, 12);
+        const openId = `local:${input.username}`;
+
+        await db.insert(users).values({
+          openId,
+          username: input.username,
+          passwordHash,
+          name: input.username,
+          loginMethod: "local",
+          lastSignedIn: new Date(),
+        });
+
+        const newUser = await db
+          .select()
+          .from(users)
+          .where(eq(users.username, input.username))
+          .limit(1);
+        if (!newUser[0]) throw new Error("Failed to create account");
+
+        const token = await sdk.createSessionToken(openId, { name: input.username });
+        const cookieOptions = getSessionCookieOptions(ctx.req);
+        ctx.res.cookie(COOKIE_NAME, token, {
+          ...cookieOptions,
+          maxAge: 365 * 24 * 60 * 60 * 1000,
+        });
+
+        return { success: true, username: input.username };
+      }),
+
+    /**
+     * Login with username + password.
+     * Returns a session cookie on success.
+     */
+    login: publicProcedure
+      .input(
+        z.object({
+          username: z.string().min(1),
+          password: z.string().min(1),
+        })
+      )
+      .mutation(async ({ input, ctx }) => {
+        const db = await getDb();
+        if (!db) throw new Error("Database unavailable");
+
+        const rows = await db
+          .select()
+          .from(users)
+          .where(eq(users.username, input.username))
+          .limit(1);
+
+        const user = rows[0];
+        if (!user || !user.passwordHash) {
+          throw new Error("Invalid username or password");
+        }
+
+        const valid = await bcrypt.compare(input.password, user.passwordHash);
+        if (!valid) {
+          throw new Error("Invalid username or password");
+        }
+
+        // Update lastSignedIn
+        await db
+          .update(users)
+          .set({ lastSignedIn: new Date() })
+          .where(eq(users.id, user.id));
+
+        const token = await sdk.createSessionToken(user.openId, { name: user.name ?? user.username ?? "" });
+        const cookieOptions = getSessionCookieOptions(ctx.req);
+        ctx.res.cookie(COOKIE_NAME, token, {
+          ...cookieOptions,
+          maxAge: 365 * 24 * 60 * 60 * 1000,
+        });
+
+        return { success: true, username: user.username ?? input.username };
       }),
   }),
 

@@ -11,8 +11,13 @@ export const users = mysqlTable("users", {
    * Use this for relations between tables.
    */
   id: int("id").autoincrement().primaryKey(),
-  /** Manus OAuth identifier (openId) returned from the OAuth callback. Unique per user. */
+  /** Manus OAuth identifier (openId) returned from the OAuth callback. Unique per user.
+   * For username/password users this is set to 'local:<username>' to keep the unique constraint. */
   openId: varchar("openId", { length: 64 }).notNull().unique(),
+  /** Username for local (non-OAuth) accounts. Unique when set. */
+  username: varchar("username", { length: 64 }).unique(),
+  /** bcrypt hash of the password for local accounts. Null for OAuth users. */
+  passwordHash: varchar("passwordHash", { length: 256 }),
   name: text("name"),
   email: varchar("email", { length: 320 }),
   loginMethod: varchar("loginMethod", { length: 64 }),
