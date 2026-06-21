@@ -433,7 +433,7 @@ function NavBar() {
         <div className="flex items-center gap-3">
           <div className="flex items-center gap-2 text-xs font-mono text-[oklch(0.68_0.012_265)]">
             <User size={12} className="text-[oklch(0.78_0.12_85)]" />
-            <span className="hidden sm:inline">{user.name ?? user.email ?? "Pianist"}</span>
+            <span className="hidden sm:inline">{user.username ?? user.name ?? user.email ?? "Pianist"}</span>
           </div>
           <button
             onClick={() => logout()}
