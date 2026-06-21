@@ -18,6 +18,10 @@ import { format, addDays } from "date-fns";
 import ScoreViewer from "@/components/ScoreViewer";
 import Metronome from "@/components/Metronome";
 
+// IMSLP public-domain PDF for La Campanella S.141/3 (redirects to a direct PDF)
+const LC_SCORE_URL = "https://imslp.org/wiki/Special:ReverseLookup/02085";
+const LC_SCORE_MIME = "application/pdf";
+
 const LOGO_TREBLE = "https://d2xsxph8kpxj0f.cloudfront.net/310519663449376037/iyZgf5CgymBq6EtTfh66yp/logo_treble-Ys7HU4Ydwkc3JS4KPHV5db.webp";
 const HERO_BG = "https://d2xsxph8kpxj0f.cloudfront.net/310519663449376037/iyZgf5CgymBq6EtTfh66yp/hero_bg-DDCWpXMzKGFmMUM3oU8SpS.webp";
 
@@ -37,6 +41,50 @@ const LA_CAMPANELLA_ANALYSIS = {
     { title: "4th & 5th Finger Trills", icon: "tr", location: "mm. 80–83", description: "The right hand must sustain a trill using the weakest fingers — the 4th and 5th — while simultaneously voicing a lower melody note. These fingers share a common tendon and resist independent movement.", tip: "Practice the trill alone (no melody note) for 20 minutes before adding the lower voice." },
     { title: "Chromatic Scales", icon: "≈", location: "mm. 73+", description: "Lightning-fast chromatic runs must be executed with feather-light articulation and perfect evenness of tone. These passages require the thumb to pass smoothly under the hand without 'bumping' the rhythm.", tip: "Practice staccato at half tempo first. As you increase speed, make the staccato progressively lighter." },
     { title: "Octaves & Chords", icon: "𝄞", location: "Climax section", description: "The climactic section demands rapid, powerful octave playing and dense chordal passages. The wrist must absorb each octave's impact without locking up, using a wrist-bounce technique.", tip: "Never practice the octave climax when your forearm is already tired. Fresh hands only." },
+  ],
+  editionNotes: [
+    { edition: "1851 Breitkopf & Härtel (S.141/3)", key: "G-sharp minor", notes: "The definitive published version. All modern editions derive from this. The key was chosen so that the large leaps land predominantly on black keys, which are slightly raised and easier to target at speed." },
+    { edition: "1838 Ricordi (S.140/3)", key: "A minor", notes: "The intermediate revision. Lighter texture than 1834 but heavier than 1851. Rarely performed today. Useful for study as it reveals Liszt's evolving approach to the bell motif." },
+    { edition: "1834 Haslinger (S.138/3)", key: "A minor", notes: "The earliest version, transcribed directly from Paganini's violin part. Dense, unpianistic, and rarely performed. Historically important as the starting point of Liszt's transcription journey." },
+  ],
+  difficultyBreakdown: [
+    { section: "Opening theme (mm. 1–20)", difficulty: 7, label: "Hard", notes: "The right-hand leaps of a 10th and 15th must be executed at allegretto tempo. Spatial memory is critical." },
+    { section: "First variation (mm. 21–40)", difficulty: 8, label: "Very Hard", notes: "Leaps expand to a 16th interval. The left hand must provide steady accompaniment while the right hand flies." },
+    { section: "Second variation (mm. 41–60)", difficulty: 7, label: "Hard", notes: "Rapid repeated notes (bell motif) with alternating 3-2-1 and 4-3-2-1 fingering. Requires a completely relaxed wrist." },
+    { section: "Chromatic section (mm. 61–80)", difficulty: 8, label: "Very Hard", notes: "Lightning chromatic runs requiring feather-light articulation and perfect thumb-pass technique." },
+    { section: "Trill section (mm. 80–95)", difficulty: 10, label: "Extreme", notes: "The hardest passage. Sustained 4-5 finger trill while voicing a lower melody note. Requires months of isolated trill practice." },
+    { section: "Octave climax (mm. 96–110)", difficulty: 9, label: "Extreme", notes: "Rapid powerful octaves and dense chords. Wrist-bounce technique is mandatory to avoid injury." },
+  ],
+  fingeringGuide: [
+    { passage: "Bell motif (repeated notes)", rh: "4-3-2-1 or 3-2-1", lh: "Standard arpeggio fingering", notes: "Alternate fingers on the same key. The 4-3-2-1 grouping is preferred for longer passages; 3-2-1 for shorter bursts. Keep the wrist loose — no tension whatsoever." },
+    { passage: "Large leaps (10th–16th)", rh: "5 on top note, 1 on lower", lh: "1 on top note, 5 on lower", notes: "Look at the destination key before moving. Practise by touching the destination key silently first, then add the leap. Build spatial memory, not raw speed." },
+    { passage: "4th–5th finger trill (mm. 80–83)", rh: "4-5 trill, thumb holds lower note", lh: "Normal accompaniment", notes: "The 4th and 5th fingers share a common tendon. Practise the trill alone (no melody note) for 20 minutes before adding the lower voice. Use a light, fast wrist rotation." },
+    { passage: "Chromatic runs (mm. 73+)", rh: "1-2-3-1-2-3-4 pattern", lh: "Contrary motion", notes: "The thumb pass must be invisible. Practise staccato at half tempo first. Gradually reduce articulation as speed increases." },
+    { passage: "Octave passages (climax)", rh: "1-5 octaves", lh: "1-5 octaves", notes: "Use wrist bounce — never arm weight alone. The wrist absorbs each impact. Practice with a loose, floppy wrist before adding any power." },
+  ],
+  listeningGuide: [
+    { pianist: "Daniil Trifonov", year: 2013, youtubeQuery: "Daniil Trifonov La Campanella Liszt", character: "Crystalline, ethereal bell tone. Extraordinary control of the repeated notes. The leaps are almost casual — a testament to his spatial memory training.", timestamps: [
+      { time: "0:00", note: "Opening theme — notice the bell-like quality of the repeated notes" },
+      { time: "0:45", note: "First variation — watch how relaxed the wrist remains during the leaps" },
+      { time: "1:30", note: "Chromatic section — feather-light articulation at full speed" },
+      { time: "2:10", note: "Trill section — the 4-5 trill is almost inaudible as a mechanical act" },
+      { time: "2:55", note: "Octave climax — controlled power, never brute force" },
+    ]},
+    { pianist: "Evgeny Kissin", year: 1984, youtubeQuery: "Evgeny Kissin La Campanella Liszt 1984", character: "Recorded at age 12. Explosive and visceral. The climax is thunderous. A different interpretive philosophy — raw power and youthful fire.", timestamps: [
+      { time: "0:00", note: "Opening — faster tempo than most, more urgent character" },
+      { time: "1:20", note: "Chromatic runs — remarkable clarity at this age" },
+      { time: "2:45", note: "Climax — the most powerful recorded version of this passage" },
+    ]},
+    { pianist: "Lang Lang", year: 2003, youtubeQuery: "Lang Lang La Campanella Liszt", character: "Theatrical and expressive. Exaggerated dynamics and rubato. Controversial but instructive — shows the full range of interpretive freedom the piece allows.", timestamps: [
+      { time: "0:00", note: "Opening — very slow, almost meditative" },
+      { time: "1:00", note: "Bell motif — extreme dynamic contrast" },
+      { time: "2:30", note: "Climax — theatrical build-up with significant rubato" },
+    ]},
+    { pianist: "Martha Argerich", year: 1982, youtubeQuery: "Martha Argerich La Campanella Liszt", character: "Precise and aristocratic. The most technically clean version. Every note is intentional. A masterclass in control over showmanship.", timestamps: [
+      { time: "0:00", note: "Opening — perfect evenness in the repeated notes" },
+      { time: "1:45", note: "Trill section — effortless 4-5 trill, completely integrated" },
+      { time: "2:50", note: "Climax — power without sacrifice of clarity" },
+    ]},
   ],
   hanonExercises: [
     { number: "1–5", focus: "Basic finger independence, 4th & 5th finger strengthening", application: "Builds foundational independence of the weaker fingers used in trills and leaps" },
@@ -643,6 +691,24 @@ export default function CompositionDetail() {
   const [splitScreen, setSplitScreen] = useState(false);
   const [metronomeOpen, setMetronomeOpen] = useState(false);
 
+  // Practice journal — per-day notes stored in localStorage
+  const LC_JOURNAL_KEY = "la-campanella-journal-v1";
+  const [journalNotes, setJournalNotes] = useState<Record<number, string>>(() => {
+    if (!isBuiltIn) return {};
+    try {
+      const raw = localStorage.getItem(LC_JOURNAL_KEY);
+      if (raw) return JSON.parse(raw);
+    } catch {}
+    return {};
+  });
+  const [journalDay, setJournalDay] = useState<number>(1);
+  const [expandedListeningIdx, setExpandedListeningIdx] = useState<number | null>(null);
+
+  useEffect(() => {
+    if (!isBuiltIn) return;
+    try { localStorage.setItem(LC_JOURNAL_KEY, JSON.stringify(journalNotes)); } catch {}
+  }, [journalNotes, isBuiltIn]);
+
   useEffect(() => {
     try {
       if (startDate) {
@@ -725,10 +791,20 @@ export default function CompositionDetail() {
     setActiveSection(id);
   };
 
-  const hasScore = !isBuiltIn && !!composition?.fileUrl;
+  // For built-in La Campanella, use the IMSLP public-domain score URL
+  const scoreUrl = isBuiltIn ? LC_SCORE_URL : (composition?.fileUrl ?? null);
+  const scoreMime = isBuiltIn ? LC_SCORE_MIME : (composition?.mimeType ?? "application/pdf");
+  const hasScore = !!scoreUrl;
 
   const NAV_ITEMS = [
     ...(hasScore ? [{ id: "score", label: "View Score", icon: FileMusic }] : []),
+    ...(isBuiltIn ? [
+      { id: "fingering", label: "Fingering Guide", icon: Music },
+      { id: "difficulty", label: "Difficulty Breakdown", icon: Dumbbell },
+      { id: "editions", label: "Editions & History", icon: BookOpen },
+      { id: "listening", label: "Listening Guide", icon: Youtube },
+      { id: "journal", label: "Practice Journal", icon: Calendar },
+    ] : []),
     { id: "history", label: "Historical Context", icon: BookOpen },
     { id: "technical", label: "Technical Evaluation", icon: Music },
     { id: "hanon", label: "Hanon Exercises", icon: Dumbbell },
@@ -826,7 +902,7 @@ export default function CompositionDetail() {
             {hasScore && (
               <button
                 onClick={() => setSplitScreen(s => !s)}
-                title={splitScreen ? "Exit split-screen" : "Split-screen: Score + Tracker"}
+                title={splitScreen ? "Exit split-screen" : isBuiltIn ? "Split-screen: IMSLP Score + Tracker" : "Split-screen: Score + Tracker"}
                 className={`ml-auto flex items-center gap-2 px-4 py-1.5 rounded-full text-xs font-mono border transition-all duration-200 ${
                   splitScreen
                     ? "bg-[oklch(0.78_0.12_85/0.15)] border-[oklch(0.78_0.12_85/0.6)] text-[oklch(0.78_0.12_85)]"
@@ -842,7 +918,7 @@ export default function CompositionDetail() {
       </header>
 
       {/* ── SPLIT-SCREEN MODE ─────────────────────────────────────────────── */}
-      {splitScreen && hasScore && composition?.fileUrl && (
+      {splitScreen && hasScore && scoreUrl && (
         <div className="fixed inset-0 top-0 z-50 bg-[oklch(0.10_0.016_265)] flex flex-col" style={{ paddingTop: 0 }}>
           {/* Split-screen top bar */}
           <div className="flex items-center justify-between px-4 py-2 border-b border-[oklch(0.22_0.016_265)] bg-[oklch(0.13_0.018_265)] shrink-0">
@@ -867,12 +943,28 @@ export default function CompositionDetail() {
           <ResizablePanelGroup direction="horizontal" className="flex-1 min-h-0">
             {/* Left: Score */}
             <ResizablePanel defaultSize={55} minSize={30}>
-              <div className="h-full overflow-auto bg-[oklch(0.11_0.016_265)]">
-                <ScoreViewer
-                  fileUrl={composition.fileUrl}
-                  mimeType={composition.mimeType ?? "application/pdf"}
-                  title={analysis?.title ?? composition.title}
-                />
+              <div className="h-full overflow-auto bg-[oklch(0.11_0.016_265)] flex items-center justify-center p-8">
+                {isBuiltIn ? (
+                  <div className="nocturne-card p-8 max-w-md w-full text-center">
+                    <FileMusic size={40} className="text-[oklch(0.78_0.12_85)] mx-auto mb-4" />
+                    <p className="font-['Playfair_Display'] font-semibold text-xl text-[oklch(0.88_0.01_85)] mb-2">La Campanella, S.141/3</p>
+                    <p className="text-sm text-[oklch(0.65_0.015_265)] mb-6">Open the public-domain score on IMSLP in a separate tab, then use this panel for the tracker.</p>
+                    <a
+                      href="https://imslp.org/wiki/Grandes_%C3%A9tudes_de_Paganini,_S.141_(Liszt,_Franz)"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-2 px-5 py-2.5 rounded-lg text-sm font-mono font-semibold bg-[oklch(0.78_0.12_85)] text-[oklch(0.12_0.018_265)] hover:bg-[oklch(0.85_0.12_85)] transition-colors"
+                    >
+                      <FileMusic size={14} /> Open on IMSLP
+                    </a>
+                  </div>
+                ) : (
+                  <ScoreViewer
+                    fileUrl={scoreUrl!}
+                    mimeType={scoreMime}
+                    title={analysis?.title ?? (isBuiltIn ? "La Campanella" : composition?.title ?? "")}
+                  />
+                )}
               </div>
             </ResizablePanel>
 
@@ -1005,7 +1097,7 @@ export default function CompositionDetail() {
           <div className="max-w-4xl mx-auto px-6 lg:px-12 py-20 space-y-0">
 
             {/* ── SCORE VIEWER ───────────────────────────────────────────── */}
-            {hasScore && composition?.fileUrl && (
+            {hasScore && scoreUrl && (
               <>
                 <section id="score" className="pb-2">
                   <div className="flex items-center gap-4 mb-6">
@@ -1016,15 +1108,45 @@ export default function CompositionDetail() {
                     <span className="text-[oklch(0.78_0.12_85)] text-xl select-none">♪</span>
                   </div>
                   <h2 className="font-['Playfair_Display'] font-bold text-4xl sm:text-5xl text-[oklch(0.92_0.01_85)] mb-4">Your Score</h2>
-                  <p className="text-[oklch(0.60_0.015_265)] text-sm mb-8">
-                    Read the score directly in the app. Use the toolbar to zoom, navigate pages, rotate, or download.
-                    Click the fullscreen button for an immersive practice view.
-                  </p>
-                  <ScoreViewer
-                    fileUrl={composition.fileUrl}
-                    mimeType={composition.mimeType ?? "application/pdf"}
-                    title={analysis?.title ?? composition.title}
-                  />
+                  {isBuiltIn ? (
+                    <div className="nocturne-card p-8 flex flex-col sm:flex-row items-start sm:items-center gap-6">
+                      <div className="flex-1">
+                        <p className="font-['Playfair_Display'] font-semibold text-xl text-[oklch(0.88_0.01_85)] mb-2">La Campanella, S.141/3</p>
+                        <p className="text-sm text-[oklch(0.65_0.015_265)] leading-relaxed mb-1">Franz Liszt &mdash; Grandes &Eacute;tudes de Paganini</p>
+                        <p className="text-xs font-mono text-[oklch(0.55_0.012_265)]">Public domain &middot; IMSLP Petrucci Music Library &middot; 1851 Breitkopf &amp; H&auml;rtel edition</p>
+                      </div>
+                      <div className="flex flex-col gap-3 shrink-0">
+                        <a
+                          href="https://imslp.org/wiki/Grandes_%C3%A9tudes_de_Paganini,_S.141_(Liszt,_Franz)"
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center gap-2 px-5 py-2.5 rounded-lg text-sm font-mono font-semibold bg-[oklch(0.78_0.12_85)] text-[oklch(0.12_0.018_265)] hover:bg-[oklch(0.85_0.12_85)] transition-colors"
+                        >
+                          <FileMusic size={14} /> Open Score on IMSLP
+                        </a>
+                        <a
+                          href="https://imslp.org/wiki/Special:ReverseLookup/02085"
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center gap-2 px-5 py-2.5 rounded-lg text-sm font-mono border border-[oklch(0.30_0.018_265)] text-[oklch(0.72_0.015_265)] hover:border-[oklch(0.78_0.12_85/0.5)] hover:text-[oklch(0.78_0.12_85)] transition-colors"
+                        >
+                          Direct PDF Download
+                        </a>
+                      </div>
+                    </div>
+                  ) : (
+                    <>
+                      <p className="text-[oklch(0.60_0.015_265)] text-sm mb-8">
+                        Read the score directly in the app. Use the toolbar to zoom, navigate pages, rotate, or download.
+                        Click the fullscreen button for an immersive practice view.
+                      </p>
+                      <ScoreViewer
+                        fileUrl={scoreUrl!}
+                        mimeType={scoreMime}
+                        title={analysis?.title ?? (isBuiltIn ? "La Campanella" : composition?.title ?? "")}
+                      />
+                    </>
+                  )}
                 </section>
                 <GoldRule />
               </>
@@ -1324,7 +1446,206 @@ export default function CompositionDetail() {
 
             <GoldRule />
 
-            {/* ── PRACTICE PRINCIPLES ────────────────────────────────────── */}
+            {/* ── FINGERING GUIDE (built-in only) ───────────────────────── */}
+            {isBuiltIn && analysis.fingeringGuide && (
+              <>
+                <section id="fingering">
+                  <BellOrnament label="Part VI" />
+                  <h2 className="font-['Playfair_Display'] font-bold text-4xl sm:text-5xl text-[oklch(0.92_0.01_85)] mb-4">Fingering Guide</h2>
+                  <p className="text-[oklch(0.65_0.015_265)] leading-relaxed mb-10 max-w-2xl">
+                    Recommended fingerings for each technically demanding passage. These are not prescriptive — adapt to your hand size — but they reflect the consensus of major editions and master-class recordings.
+                  </p>
+                  <div className="space-y-4">
+                    {analysis.fingeringGuide.map((f: any, i: number) => (
+                      <div key={i} className="nocturne-card p-6">
+                        <div className="flex flex-wrap items-start justify-between gap-4 mb-3">
+                          <h3 className="font-['Playfair_Display'] font-semibold text-lg text-[oklch(0.88_0.01_85)]">{f.passage}</h3>
+                          <div className="flex gap-3">
+                            <span className="inline-flex flex-col items-center px-3 py-1.5 rounded bg-[oklch(0.18_0.016_265)] border border-[oklch(0.28_0.018_265)]">
+                              <span className="font-mono text-[0.55rem] text-[oklch(0.68_0.012_265)] uppercase tracking-widest mb-0.5">RH</span>
+                              <span className="font-mono text-xs text-[oklch(0.78_0.12_85)] font-bold">{f.rh}</span>
+                            </span>
+                            <span className="inline-flex flex-col items-center px-3 py-1.5 rounded bg-[oklch(0.18_0.016_265)] border border-[oklch(0.28_0.018_265)]">
+                              <span className="font-mono text-[0.55rem] text-[oklch(0.68_0.012_265)] uppercase tracking-widest mb-0.5">LH</span>
+                              <span className="font-mono text-xs text-[oklch(0.78_0.12_85)] font-bold">{f.lh}</span>
+                            </span>
+                          </div>
+                        </div>
+                        <p className="text-sm text-[oklch(0.65_0.015_265)] leading-relaxed">{f.notes}</p>
+                      </div>
+                    ))}
+                  </div>
+                </section>
+                <GoldRule />
+              </>
+            )}
+
+            {/* ── DIFFICULTY BREAKDOWN (built-in only) ───────────────────── */}
+            {isBuiltIn && analysis.difficultyBreakdown && (
+              <>
+                <section id="difficulty">
+                  <BellOrnament label="Part VII" />
+                  <h2 className="font-['Playfair_Display'] font-bold text-4xl sm:text-5xl text-[oklch(0.92_0.01_85)] mb-4">Difficulty Breakdown by Section</h2>
+                  <p className="text-[oklch(0.65_0.015_265)] leading-relaxed mb-10 max-w-2xl">
+                    Each section is rated on a scale of 1–10. Ratings reflect the consensus of pedagogical literature and the technical demands relative to the full advanced repertoire.
+                  </p>
+                  <div className="space-y-3">
+                    {analysis.difficultyBreakdown.map((s: any, i: number) => {
+                      const pct = (s.difficulty / 10) * 100;
+                      const color = s.difficulty >= 9 ? "oklch(0.65 0.18 25)" : s.difficulty >= 8 ? "oklch(0.70 0.14 55)" : "oklch(0.78 0.12 85)";
+                      return (
+                        <div key={i} className="nocturne-card p-5">
+                          <div className="flex items-center justify-between mb-2 gap-3">
+                            <span className="font-['Playfair_Display'] font-semibold text-[oklch(0.88_0.01_85)] text-sm">{s.section}</span>
+                            <span className="font-mono text-xs font-bold shrink-0" style={{ color }}>{s.label} ({s.difficulty}/10)</span>
+                          </div>
+                          <div className="w-full h-2 rounded-full bg-[oklch(0.22_0.014_265)] overflow-hidden mb-3">
+                            <div className="h-full rounded-full transition-all duration-700" style={{ width: `${pct}%`, background: color }} />
+                          </div>
+                          <p className="text-xs text-[oklch(0.60_0.015_265)] leading-relaxed">{s.notes}</p>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </section>
+                <GoldRule />
+              </>
+            )}
+
+            {/* ── EDITION NOTES (built-in only) ─────────────────────────── */}
+            {isBuiltIn && analysis.editionNotes && (
+              <>
+                <section id="editions">
+                  <BellOrnament label="Part VIII" />
+                  <h2 className="font-['Playfair_Display'] font-bold text-4xl sm:text-5xl text-[oklch(0.92_0.01_85)] mb-4">Editions &amp; Publication History</h2>
+                  <p className="text-[oklch(0.65_0.015_265)] leading-relaxed mb-10 max-w-2xl">
+                    Liszt revised this piece three times over seventeen years. Understanding the editions illuminates his compositional evolution and helps you choose the right score.
+                  </p>
+                  <div className="space-y-4">
+                    {analysis.editionNotes.map((e: any, i: number) => (
+                      <div key={i} className={`nocturne-card p-6 ${i === 0 ? "border-[oklch(0.78_0.12_85/0.35)]" : ""}`}>
+                        <div className="flex flex-wrap items-center gap-3 mb-3">
+                          <h3 className="font-['Playfair_Display'] font-semibold text-lg text-[oklch(0.88_0.01_85)]">{e.edition}</h3>
+                          {i === 0 && <span className="text-[0.65rem] font-mono px-2 py-0.5 rounded-full bg-[oklch(0.78_0.12_85/0.12)] border border-[oklch(0.78_0.12_85/0.3)] text-[oklch(0.78_0.12_85)]">Definitive</span>}
+                          <span className="text-xs font-mono text-[oklch(0.68_0.012_265)] ml-auto">{e.key}</span>
+                        </div>
+                        <p className="text-sm text-[oklch(0.65_0.015_265)] leading-relaxed">{e.notes}</p>
+                      </div>
+                    ))}
+                  </div>
+                </section>
+                <GoldRule />
+              </>
+            )}
+
+            {/* ── LISTENING GUIDE (built-in only) ───────────────────────── */}
+            {isBuiltIn && analysis.listeningGuide && (
+              <>
+                <section id="listening">
+                  <BellOrnament label="Part IX" />
+                  <h2 className="font-['Playfair_Display'] font-bold text-4xl sm:text-5xl text-[oklch(0.92_0.01_85)] mb-4">Listening Guide</h2>
+                  <p className="text-[oklch(0.65_0.015_265)] leading-relaxed mb-10 max-w-2xl">
+                    Study four landmark recordings with timestamped listening cues. Absorb the phrasing, dynamics, and musical character before your fingers learn the notes.
+                  </p>
+                  <div className="space-y-4">
+                    {analysis.listeningGuide.map((g: any, idx: number) => (
+                      <div key={idx} className="nocturne-card overflow-hidden">
+                        <button
+                          className="w-full flex items-center justify-between p-6 text-left hover:bg-[oklch(0.18_0.016_265)] transition-colors"
+                          onClick={() => setExpandedListeningIdx(expandedListeningIdx === idx ? null : idx)}
+                        >
+                          <div>
+                            <div className="flex items-center gap-3 mb-1">
+                              <h3 className="font-['Playfair_Display'] font-semibold text-lg text-[oklch(0.88_0.01_85)]">{g.pianist}</h3>
+                              <span className="font-mono text-xs text-[oklch(0.68_0.012_265)]">{g.year}</span>
+                            </div>
+                            <p className="text-sm text-[oklch(0.60_0.015_265)] leading-relaxed max-w-xl">{g.character}</p>
+                          </div>
+                          <div className="flex items-center gap-3 shrink-0 ml-4">
+                            <a
+                              href={`https://www.youtube.com/results?search_query=${encodeURIComponent(g.youtubeQuery)}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              onClick={(e) => e.stopPropagation()}
+                              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-mono bg-red-600/15 border border-red-600/30 text-red-400 hover:bg-red-600/25 transition-all"
+                            >
+                              <Play size={11} /> Watch
+                            </a>
+                            {expandedListeningIdx === idx ? <ChevronUp size={16} className="text-[oklch(0.68_0.012_265)]" /> : <ChevronDown size={16} className="text-[oklch(0.68_0.012_265)]" />}
+                          </div>
+                        </button>
+                        {expandedListeningIdx === idx && (
+                          <div className="px-6 pb-6 border-t border-[oklch(0.22_0.014_265)]">
+                            <p className="font-mono text-[0.6rem] text-[oklch(0.68_0.012_265)] uppercase tracking-widest mt-4 mb-3">Listening Cues</p>
+                            <div className="space-y-2">
+                              {g.timestamps.map((t: any, ti: number) => (
+                                <div key={ti} className="flex items-start gap-4">
+                                  <span className="font-mono text-xs text-[oklch(0.78_0.12_85)] w-10 shrink-0">{t.time}</span>
+                                  <span className="text-sm text-[oklch(0.65_0.015_265)] leading-relaxed">{t.note}</span>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </section>
+                <GoldRule />
+              </>
+            )}
+
+            {/* ── PRACTICE JOURNAL (built-in only) ──────────────────────── */}
+            {isBuiltIn && (
+              <>
+                <section id="journal">
+                  <BellOrnament label="Part X" />
+                  <h2 className="font-['Playfair_Display'] font-bold text-4xl sm:text-5xl text-[oklch(0.92_0.01_85)] mb-4">Practice Journal</h2>
+                  <p className="text-[oklch(0.65_0.015_265)] leading-relaxed mb-10 max-w-2xl">
+                    Write notes for each practice day. What went well? What needs more work? Notes are saved automatically in your browser.
+                  </p>
+                  <div className="nocturne-card p-6">
+                    {/* Day selector */}
+                    <div className="flex items-center gap-3 mb-5 flex-wrap">
+                      <span className="font-mono text-xs text-[oklch(0.68_0.012_265)] uppercase tracking-widest">Day</span>
+                      <div className="flex flex-wrap gap-1.5">
+                        {Array.from({ length: 30 }, (_, i) => i + 1).map(d => (
+                          <button
+                            key={d}
+                            onClick={() => setJournalDay(d)}
+                            className={`w-7 h-7 rounded text-xs font-mono font-bold transition-all ${
+                              journalDay === d
+                                ? "bg-[oklch(0.78_0.12_85)] text-[oklch(0.12_0.018_265)]"
+                                : journalNotes[d]
+                                  ? "bg-[oklch(0.78_0.12_85/0.15)] border border-[oklch(0.78_0.12_85/0.4)] text-[oklch(0.78_0.12_85)]"
+                                  : "border border-[oklch(0.24_0.016_265)] text-[oklch(0.40_0.012_265)] hover:border-[oklch(0.50_0.06_85)]"
+                            }`}
+                          >
+                            {d}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                    {/* Text area */}
+                    <div className="mb-3">
+                      <label className="font-mono text-[0.6rem] text-[oklch(0.68_0.012_265)] uppercase tracking-widest block mb-2">
+                        Day {journalDay} Notes
+                      </label>
+                      <textarea
+                        className="w-full h-36 rounded-lg bg-[oklch(0.10_0.016_265)] border border-[oklch(0.28_0.018_265)] text-sm text-[oklch(0.80_0.01_85)] placeholder-[oklch(0.35_0.012_265)] p-4 resize-none focus:outline-none focus:border-[oklch(0.78_0.12_85/0.6)] transition-colors leading-relaxed"
+                        placeholder={`What did you work on today? What felt good? What needs more attention?`}
+                        value={journalNotes[journalDay] ?? ""}
+                        onChange={e => setJournalNotes(prev => ({ ...prev, [journalDay]: e.target.value }))}
+                      />
+                    </div>
+                    <p className="text-[0.6rem] font-mono text-[oklch(0.40_0.012_265)]">Auto-saved to your browser · {Object.keys(journalNotes).filter(k => journalNotes[Number(k)]).length} of 30 days have notes</p>
+                  </div>
+                </section>
+                <GoldRule />
+              </>
+            )}
+
+            {/* ── PRACTICE PRINCIPLES ────────────────────────────── */}
             <section id="principles">
               <BellOrnament label="Part V" />
               <h2 className="font-['Playfair_Display'] font-bold text-4xl sm:text-5xl text-[oklch(0.92_0.01_85)] mb-10">Essential Practice Principles</h2>
