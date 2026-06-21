@@ -12,14 +12,14 @@
 - [x] Keep Manus OAuth as secondary option on auth forms
 
 ## La Campanella Full Upgrade
-- [ ] Audit: check which interactive features are gated/missing for built-in page
-- [ ] Wire floating metronome to built-in La Campanella page
-- [ ] Wire YouTube 5-video selectable cards + URL override to built-in page
-- [ ] Wire split-screen practice mode to built-in page
-- [ ] Wire score viewer (IMSLP PDF link) to built-in page
-- [ ] Wire progress bar display to built-in page
-- [ ] Add fingering guide section to La Campanella data + UI
-- [ ] Add listening guide with timestamps (recommended recordings)
-- [ ] Add practice journal/notes field (localStorage-backed)
-- [ ] Add difficulty breakdown by section
-- [ ] Add edition/publication notes
+- [x] Audit: check which interactive features are gated/missing for built-in page
+- [x] Wire floating metronome to built-in La Campanella page
+- [x] Wire YouTube 5-video selectable cards + URL override to built-in page
+- [x] Wire split-screen practice mode to built-in page
+- [x] Wire score viewer (IMSLP PDF link + direct download card) to built-in page
+- [x] Wire progress bar display to built-in page
+- [x] Add fingering guide section to La Campanella data + UI
+- [x] Add listening guide with timestamps (4 pianists: Trifonov, Kissin, Lang Lang, Argerich)
+- [x] Add practice journal/notes field (localStorage-backed, 30-day grid)
+- [x] Add difficulty breakdown by section with animated bars
+- [x] Add edition/publication notes (3 editions: 1834, 1838, 1851)
