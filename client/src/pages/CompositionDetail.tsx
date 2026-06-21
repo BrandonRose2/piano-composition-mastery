@@ -182,11 +182,34 @@ function ProgressRing({ done, total }: { done: number; total: number }) {
 }
 
 // ── Performance Video Section ────────────────────────────────────────────────
+/** Extract a YouTube video ID from any YouTube URL format */
+function extractYouTubeId(url: string): string | null {
+  try {
+    const u = new URL(url.trim());
+    // youtu.be/ID
+    if (u.hostname === "youtu.be") return u.pathname.slice(1).split(/[?&]/)[0] || null;
+    // youtube.com/watch?v=ID or /embed/ID or /shorts/ID
+    const v = u.searchParams.get("v");
+    if (v) return v;
+    const pathMatch = u.pathname.match(/\/(embed|shorts|v)\/([^/?&]+)/);
+    if (pathMatch) return pathMatch[2];
+  } catch { /* not a valid URL */ }
+  // bare ID (11 chars)
+  const bare = url.trim().match(/^[A-Za-z0-9_-]{11}$/);
+  return bare ? bare[0] : null;
+}
+
 function PerformanceVideoSection({
   title, composer, musicKey = "", tempo = ""
 }: { title: string; composer: string; musicKey?: string; tempo?: string }) {
   const [selectedIdx, setSelectedIdx] = useState(0);
   const [playing, setPlaying] = useState(false);
+
+  // Manual URL override state
+  const [overrideInput, setOverrideInput] = useState("");
+  const [overrideId, setOverrideId] = useState<string | null>(null);
+  const [overrideError, setOverrideError] = useState("");
+  const [showOverride, setShowOverride] = useState(false);
 
   const { data: videos = [], isLoading, error } = trpc.youtube.searchPerformance.useQuery(
     { title, composer, key: musicKey, tempo },
@@ -198,6 +221,28 @@ function PerformanceVideoSection({
     if (idx === selectedIdx) return;
     setSelectedIdx(idx);
     setPlaying(false);
+    // Clear override when picking from search results
+    setOverrideId(null);
+    setOverrideInput("");
+    setOverrideError("");
+  };
+
+  const handleOverrideSubmit = () => {
+    const id = extractYouTubeId(overrideInput);
+    if (!id) {
+      setOverrideError("Could not find a valid YouTube video ID in that URL.");
+      return;
+    }
+    setOverrideId(id);
+    setOverrideError("");
+    setPlaying(false);
+    setShowOverride(false);
+  };
+
+  const handleOverrideClear = () => {
+    setOverrideId(null);
+    setOverrideInput("");
+    setOverrideError("");
   };
 
   if (isLoading) {
@@ -218,9 +263,11 @@ function PerformanceVideoSection({
     );
   }
 
-  const video = videos[selectedIdx] ?? videos[0];
-  const embedUrl = `https://www.youtube.com/embed/${video.videoId}?autoplay=1&rel=0&modestbranding=1`;
-  const watchUrl = `https://www.youtube.com/watch?v=${video.videoId}`;
+  // Determine which video to show — override takes priority
+  const activeVideoId = overrideId ?? (videos[selectedIdx]?.videoId ?? videos[0]?.videoId);
+  const activeVideo = overrideId ? null : (videos[selectedIdx] ?? videos[0]);
+  const embedUrl = `https://www.youtube.com/embed/${activeVideoId}?autoplay=1&rel=0&modestbranding=1`;
+  const watchUrl = `https://www.youtube.com/watch?v=${activeVideoId}`;
 
   return (
     <div className="space-y-5">
@@ -228,8 +275,14 @@ function PerformanceVideoSection({
       <div className="relative w-full rounded-xl overflow-hidden border border-[oklch(0.24_0.016_265)] bg-[oklch(0.10_0.016_265)]" style={{ aspectRatio: "16/9" }}>
         {!playing ? (
           <>
-            {video.thumbnailUrl && (
-              <img src={video.thumbnailUrl} alt={video.title} className="w-full h-full object-cover opacity-70" />
+            {activeVideo?.thumbnailUrl && (
+              <img src={activeVideo.thumbnailUrl} alt={activeVideo.title} className="w-full h-full object-cover opacity-70" />
+            )}
+            {/* Override: dark placeholder with YouTube icon */}
+            {overrideId && !activeVideo && (
+              <div className="absolute inset-0 bg-[oklch(0.10_0.016_265)] flex items-center justify-center">
+                <Youtube size={48} className="text-[oklch(0.30_0.012_265)]" />
+              </div>
             )}
             <div className="absolute inset-0 flex flex-col items-center justify-center bg-[oklch(0.08_0.016_265/0.6)]">
               <button
@@ -239,14 +292,21 @@ function PerformanceVideoSection({
               >
                 <Play size={32} className="text-[oklch(0.78_0.12_85)] ml-1 group-hover:scale-110 transition-transform" fill="currentColor" />
               </button>
-              <p className="font-['Playfair_Display'] text-lg text-[oklch(0.88_0.01_85)] text-center px-8 max-w-2xl leading-snug">{video.title}</p>
-              <p className="text-sm text-[oklch(0.72_0.015_265)] mt-1 font-mono">{video.channelTitle}</p>
+              {activeVideo && (
+                <>
+                  <p className="font-['Playfair_Display'] text-lg text-[oklch(0.88_0.01_85)] text-center px-8 max-w-2xl leading-snug">{activeVideo.title}</p>
+                  <p className="text-sm text-[oklch(0.72_0.015_265)] mt-1 font-mono">{activeVideo.channelTitle}</p>
+                </>
+              )}
+              {overrideId && !activeVideo && (
+                <p className="text-sm text-[oklch(0.68_0.012_265)] font-mono mt-2">Custom video — click to play</p>
+              )}
             </div>
           </>
         ) : (
           <iframe
             src={embedUrl}
-            title={video.title}
+            title={activeVideo?.title ?? "Custom performance"}
             allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
             allowFullScreen
             className="w-full h-full border-0"
@@ -257,32 +317,183 @@ function PerformanceVideoSection({
       {/* ── Active video metadata ───────────────────────────────────────── */}
       <div className="nocturne-card p-4 flex flex-wrap items-start justify-between gap-4">
         <div className="flex-1 min-w-0">
-          <p className="font-['Playfair_Display'] font-semibold text-[oklch(0.88_0.01_85)] leading-snug mb-1">{video.title}</p>
-          <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs font-mono text-[oklch(0.68_0.012_265)]">
-            {video.channelTitle && <span className="flex items-center gap-1"><User size={10} />{video.channelTitle}</span>}
-            {video.viewCountText && <span className="flex items-center gap-1"><Eye size={10} />{video.viewCountText} views</span>}
-            {video.lengthText && <span className="flex items-center gap-1"><Clock size={10} />{video.lengthText}</span>}
-            {video.publishedTimeText && <span className="text-[oklch(0.40_0.012_265)]">{video.publishedTimeText}</span>}
-          </div>
+          {overrideId && !activeVideo ? (
+            <div className="flex items-center gap-2">
+              <span className="inline-flex items-center gap-1.5 text-xs font-mono px-2 py-0.5 rounded-full bg-[oklch(0.78_0.12_85/0.12)] text-[oklch(0.78_0.12_85)] border border-[oklch(0.78_0.12_85/0.3)]">
+                <Youtube size={10} /> Custom URL
+              </span>
+              <span className="text-xs font-mono text-[oklch(0.55_0.012_265)] truncate">{`youtube.com/watch?v=${overrideId}`}</span>
+            </div>
+          ) : (
+            <>
+              <p className="font-['Playfair_Display'] font-semibold text-[oklch(0.88_0.01_85)] leading-snug mb-1">{activeVideo?.title}</p>
+              <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs font-mono text-[oklch(0.68_0.012_265)]">
+                {activeVideo?.channelTitle && <span className="flex items-center gap-1"><User size={10} />{activeVideo.channelTitle}</span>}
+                {activeVideo?.viewCountText && <span className="flex items-center gap-1"><Eye size={10} />{activeVideo.viewCountText} views</span>}
+                {activeVideo?.lengthText && <span className="flex items-center gap-1"><Clock size={10} />{activeVideo.lengthText}</span>}
+                {activeVideo?.publishedTimeText && <span className="text-[oklch(0.40_0.012_265)]">{activeVideo.publishedTimeText}</span>}
+              </div>
+            </>
+          )}
         </div>
-        <a
-          href={watchUrl}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="inline-flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-mono font-medium
-            bg-red-600/15 border border-red-600/30 text-red-400
-            hover:bg-red-600/25 hover:border-red-500/50 hover:text-red-300
-            transition-all duration-150 shrink-0"
-        >
-          <Youtube size={13} /> Watch on YouTube
-        </a>
+        <div className="flex items-center gap-2 shrink-0">
+          {overrideId && (
+            <button
+              onClick={handleOverrideClear}
+              className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-mono
+                bg-[oklch(0.18_0.016_265)] border border-[oklch(0.28_0.018_265)] text-[oklch(0.65_0.015_265)]
+                hover:border-red-500/40 hover:text-red-400 transition-all duration-150"
+              title="Clear custom URL and return to search results"
+            >
+              <X size={11} /> Clear override
+            </button>
+          )}
+          <a
+            href={watchUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-mono font-medium
+              bg-red-600/15 border border-red-600/30 text-red-400
+              hover:bg-red-600/25 hover:border-red-500/50 hover:text-red-300
+              transition-all duration-150"
+          >
+            <Youtube size={13} /> Watch on YouTube
+          </a>
+        </div>
       </div>
 
       {/* ── Selectable video cards ──────────────────────────────────────── */}
       {videos.length > 1 && (
         <div>
+          <div className="flex items-center justify-between mb-3">
+            <p className="text-xs font-mono text-[oklch(0.55_0.015_265)] uppercase tracking-widest">
+              {videos.length} performances found — select the correct one:
+            </p>
+            {!overrideId && (
+              <button
+                onClick={() => setShowOverride(v => !v)}
+                className={`inline-flex items-center gap-1.5 text-xs font-mono px-2.5 py-1 rounded-lg border transition-all duration-150 ${
+                  showOverride
+                    ? "border-[oklch(0.78_0.12_85/0.5)] bg-[oklch(0.78_0.12_85/0.08)] text-[oklch(0.78_0.12_85)]"
+                    : "border-[oklch(0.28_0.018_265)] bg-[oklch(0.16_0.016_265)] text-[oklch(0.60_0.015_265)] hover:border-[oklch(0.78_0.12_85/0.4)] hover:text-[oklch(0.78_0.12_85)]"
+                }`}
+              >
+                <Youtube size={11} />
+                {showOverride ? "Cancel" : "Paste URL"}
+              </button>
+            )}
+          </div>
+
+          {/* URL override input */}
+          {showOverride && !overrideId && (
+            <div className="nocturne-card p-4 mb-3 space-y-3">
+              <p className="text-xs text-[oklch(0.68_0.012_265)] font-mono">
+                Paste any YouTube URL or video ID to override the search results:
+              </p>
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  value={overrideInput}
+                  onChange={e => { setOverrideInput(e.target.value); setOverrideError(""); }}
+                  onKeyDown={e => e.key === "Enter" && handleOverrideSubmit()}
+                  placeholder="https://www.youtube.com/watch?v=..."
+                  className="flex-1 min-w-0 px-3 py-2 rounded-lg text-sm font-mono
+                    bg-[oklch(0.10_0.016_265)] border border-[oklch(0.28_0.018_265)]
+                    text-[oklch(0.85_0.01_85)] placeholder:text-[oklch(0.38_0.012_265)]
+                    focus:outline-none focus:border-[oklch(0.78_0.12_85/0.6)] focus:ring-1 focus:ring-[oklch(0.78_0.12_85/0.2)]
+                    transition-all duration-150"
+                  autoFocus
+                />
+                <button
+                  onClick={handleOverrideSubmit}
+                  disabled={!overrideInput.trim()}
+                  className="shrink-0 inline-flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-mono font-semibold
+                    bg-[oklch(0.78_0.12_85/0.15)] border border-[oklch(0.78_0.12_85/0.4)] text-[oklch(0.78_0.12_85)]
+                    hover:bg-[oklch(0.78_0.12_85/0.25)] hover:border-[oklch(0.78_0.12_85/0.7)]
+                    disabled:opacity-40 disabled:cursor-not-allowed
+                    transition-all duration-150"
+                >
+                  <Play size={11} fill="currentColor" /> Use this video
+                </button>
+              </div>
+              {overrideError && (
+                <p className="text-xs font-mono text-red-400 flex items-center gap-1.5">
+                  <AlertCircle size={11} /> {overrideError}
+                </p>
+              )}
+              <p className="text-[0.65rem] font-mono text-[oklch(0.42_0.012_265)]">
+                Accepts: youtube.com/watch?v=ID · youtu.be/ID · /shorts/ID · bare 11-char video ID
+              </p>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Show URL override button even when no search results */}
+      {videos.length <= 1 && (
+        <div>
+          {!overrideId && (
+            <button
+              onClick={() => setShowOverride(v => !v)}
+              className={`inline-flex items-center gap-1.5 text-xs font-mono px-2.5 py-1 rounded-lg border transition-all duration-150 ${
+                showOverride
+                  ? "border-[oklch(0.78_0.12_85/0.5)] bg-[oklch(0.78_0.12_85/0.08)] text-[oklch(0.78_0.12_85)]"
+                  : "border-[oklch(0.28_0.018_265)] bg-[oklch(0.16_0.016_265)] text-[oklch(0.60_0.015_265)] hover:border-[oklch(0.78_0.12_85/0.4)] hover:text-[oklch(0.78_0.12_85)]"
+              }`}
+            >
+              <Youtube size={11} />
+              {showOverride ? "Cancel" : "Paste a different URL"}
+            </button>
+          )}
+          {showOverride && !overrideId && (
+            <div className="nocturne-card p-4 mt-3 space-y-3">
+              <p className="text-xs text-[oklch(0.68_0.012_265)] font-mono">
+                Paste any YouTube URL or video ID:
+              </p>
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  value={overrideInput}
+                  onChange={e => { setOverrideInput(e.target.value); setOverrideError(""); }}
+                  onKeyDown={e => e.key === "Enter" && handleOverrideSubmit()}
+                  placeholder="https://www.youtube.com/watch?v=..."
+                  className="flex-1 min-w-0 px-3 py-2 rounded-lg text-sm font-mono
+                    bg-[oklch(0.10_0.016_265)] border border-[oklch(0.28_0.018_265)]
+                    text-[oklch(0.85_0.01_85)] placeholder:text-[oklch(0.38_0.012_265)]
+                    focus:outline-none focus:border-[oklch(0.78_0.12_85/0.6)] focus:ring-1 focus:ring-[oklch(0.78_0.12_85/0.2)]
+                    transition-all duration-150"
+                  autoFocus
+                />
+                <button
+                  onClick={handleOverrideSubmit}
+                  disabled={!overrideInput.trim()}
+                  className="shrink-0 inline-flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-mono font-semibold
+                    bg-[oklch(0.78_0.12_85/0.15)] border border-[oklch(0.78_0.12_85/0.4)] text-[oklch(0.78_0.12_85)]
+                    hover:bg-[oklch(0.78_0.12_85/0.25)] hover:border-[oklch(0.78_0.12_85/0.7)]
+                    disabled:opacity-40 disabled:cursor-not-allowed
+                    transition-all duration-150"
+                >
+                  <Play size={11} fill="currentColor" /> Use this video
+                </button>
+              </div>
+              {overrideError && (
+                <p className="text-xs font-mono text-red-400 flex items-center gap-1.5">
+                  <AlertCircle size={11} /> {overrideError}
+                </p>
+              )}
+              <p className="text-[0.65rem] font-mono text-[oklch(0.42_0.012_265)]">
+                Accepts: youtube.com/watch?v=ID · youtu.be/ID · /shorts/ID · bare 11-char video ID
+              </p>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Selectable cards */}
+      {videos.length > 1 && (
+        <div>
           <p className="text-xs font-mono text-[oklch(0.55_0.015_265)] uppercase tracking-widest mb-3">
-            {videos.length} performances found — select the correct one:
+            Or choose from search results:
           </p>
           <div className="grid gap-2">
             {videos.map((v, idx) => {
