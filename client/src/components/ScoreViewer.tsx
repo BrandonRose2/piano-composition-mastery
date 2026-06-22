@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, useCallback } from "react";
 import {
   ZoomIn, ZoomOut, ChevronLeft, ChevronRight, Maximize2, Minimize2,
-  Loader2, AlertCircle, Download, RotateCw
+  Loader2, AlertCircle, Download, RotateCw, Printer
 } from "lucide-react";
 
 // ── Types ────────────────────────────────────────────────────────────────────
@@ -180,6 +180,15 @@ function PdfViewer({ fileUrl, title }: { fileUrl: string; title?: string }) {
             <ZoomIn size={15} />
           </button>
           <div className="w-px h-4 bg-[oklch(0.25_0.016_265)] mx-1" />
+          <button
+            onClick={() => {
+              const win = window.open(fileUrl, '_blank');
+              if (win) { win.onload = () => { win.focus(); win.print(); }; }
+            }}
+            className="p-1.5 rounded hover:bg-[oklch(0.22_0.016_265)] transition-colors text-[oklch(0.65_0.015_265)]"
+            title="Print score">
+            <Printer size={15} />
+          </button>
           <a href={fileUrl} download target="_blank" rel="noopener noreferrer"
             className="p-1.5 rounded hover:bg-[oklch(0.22_0.016_265)] transition-colors text-[oklch(0.65_0.015_265)]"
             title="Download PDF">
@@ -268,6 +277,15 @@ function ImageViewer({ fileUrl, title }: { fileUrl: string; title?: string }) {
             <RotateCw size={15} />
           </button>
           <div className="w-px h-4 bg-[oklch(0.25_0.016_265)] mx-1" />
+          <button
+            onClick={() => {
+              const win = window.open(fileUrl, '_blank');
+              if (win) { win.onload = () => { win.focus(); win.print(); }; }
+            }}
+            className="p-1.5 rounded hover:bg-[oklch(0.22_0.016_265)] transition-colors text-[oklch(0.65_0.015_265)]"
+            title="Print score">
+            <Printer size={15} />
+          </button>
           <a href={fileUrl} download target="_blank" rel="noopener noreferrer"
             className="p-1.5 rounded hover:bg-[oklch(0.22_0.016_265)] transition-colors text-[oklch(0.65_0.015_265)]"
             title="Download">
