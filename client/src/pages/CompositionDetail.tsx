@@ -1684,8 +1684,9 @@ export default function CompositionDetail() {
       <div
         style={{
           position: "fixed",
-          bottom: "1rem",
-          right: "1rem",
+          top: "50%",
+          right: "0",
+          transform: "translateY(-50%)",
           zIndex: 50,
           display: "flex",
           flexDirection: "column",
@@ -1722,32 +1723,37 @@ export default function CompositionDetail() {
           </div>
         )}
 
-        {/* Toggle button */}
+        {/* Toggle button — vertical tab on right edge */}
         <button
           onClick={() => setMetronomeOpen((o) => !o)}
           style={{
             display: "flex",
+            flexDirection: "column",
             alignItems: "center",
-            gap: "0.4rem",
-            padding: "0.55rem 1rem",
-            borderRadius: "2rem",
+            gap: "0.35rem",
+            padding: "0.9rem 0.55rem",
+            borderRadius: "0.75rem 0 0 0.75rem",
             background: metronomeOpen
               ? "oklch(0.78 0.12 85)"
               : "oklch(0.16 0.018 265)",
-            border: "1px solid oklch(0.78 0.12 85 / 0.50)",
+            border: "1px solid oklch(0.78 0.12 85 / 0.55)",
+            borderRight: "none",
             color: metronomeOpen ? "oklch(0.12 0.015 265)" : "oklch(0.78 0.12 85)",
-            fontSize: "0.72rem",
+            fontSize: "0.6rem",
             fontFamily: "'JetBrains Mono', monospace",
             fontWeight: 700,
-            letterSpacing: "0.08em",
+            letterSpacing: "0.12em",
             textTransform: "uppercase",
             cursor: "pointer",
-            boxShadow: "0 4px 20px oklch(0 0 0 / 0.4)",
+            boxShadow: "-4px 0 20px oklch(0 0 0 / 0.35)",
             transition: "all 160ms cubic-bezier(0.23,1,0.32,1)",
+            writingMode: "vertical-rl",
+            textOrientation: "mixed",
+            minHeight: "5.5rem",
           }}
           aria-label="Toggle metronome"
         >
-          <Timer size={13} />
+          <Timer size={14} style={{ transform: "rotate(90deg)" }} />
           {metronomeOpen ? "Close" : "Metronome"}
         </button>
       </div>
