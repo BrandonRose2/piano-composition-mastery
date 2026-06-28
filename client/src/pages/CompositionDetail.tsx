@@ -248,8 +248,8 @@ function extractYouTubeId(url: string): string | null {
 }
 
 function PerformanceVideoSection({
-  title, composer, musicKey = "", tempo = "", onVideoChange
-}: { title: string; composer: string; musicKey?: string; tempo?: string; onVideoChange?: (videoId: string | null) => void }) {
+  title, composer, musicKey = "", tempo = "", onVideoChange, stopPlayingRef
+}: { title: string; composer: string; musicKey?: string; tempo?: string; onVideoChange?: (videoId: string | null) => void; stopPlayingRef?: React.MutableRefObject<(() => void) | null> }) {
   const [selectedIdx, setSelectedIdx] = useState(0);
   const [playing, setPlaying] = useState(false);
 
@@ -304,6 +304,12 @@ function PerformanceVideoSection({
   useEffect(() => {
     if (onVideoChange) onVideoChange(activeVideoId ?? null);
   }, [activeVideoId, onVideoChange]);
+
+  // Expose a stopPlaying function to the parent via ref
+  useEffect(() => {
+    if (stopPlayingRef) stopPlayingRef.current = () => setPlaying(false);
+    return () => { if (stopPlayingRef) stopPlayingRef.current = null; };
+  }, [stopPlayingRef]);
 
   if (isLoading) {
     return (
@@ -698,6 +704,7 @@ export default function CompositionDetail() {
   const [splitVideoScreen, setSplitVideoScreen] = useState(false);
   const [activePerformanceVideoId, setActivePerformanceVideoId] = useState<string | null>(null);
   const handleVideoChange = useCallback((id: string | null) => setActivePerformanceVideoId(id), []);
+  const stopPlayingRef = useRef<(() => void) | null>(null);
   const [metronomeOpen, setMetronomeOpen] = useState(false);
 
   // Practice journal — per-day notes stored in localStorage
@@ -910,7 +917,7 @@ export default function CompositionDetail() {
             ))}
             {hasScore && (
               <button
-                onClick={() => { setSplitScreen(s => !s); setSplitVideoScreen(false); }}
+                onClick={() => { const entering = !splitScreen; setSplitScreen(s => !s); setSplitVideoScreen(false); if (entering && stopPlayingRef.current) stopPlayingRef.current(); }}
                 title={splitScreen ? "Exit split-screen" : isBuiltIn ? "Split-screen: IMSLP Score + Tracker" : "Split-screen: Score + Tracker"}
                 className={`ml-auto flex items-center gap-2 px-4 py-1.5 rounded-full text-xs font-mono border transition-all duration-200 ${
                   splitScreen
@@ -925,7 +932,7 @@ export default function CompositionDetail() {
             {/* Score + Video split-screen button */}
             {hasScore && (
               <button
-                onClick={() => { setSplitVideoScreen(s => !s); setSplitScreen(false); }}
+                onClick={() => { const entering = !splitVideoScreen; setSplitVideoScreen(s => !s); setSplitScreen(false); if (entering && stopPlayingRef.current) stopPlayingRef.current(); }}
                 title={splitVideoScreen ? "Exit score + video split" : "Split-screen: Score + Video"}
                 className={`flex items-center gap-2 px-4 py-1.5 rounded-full text-xs font-mono border transition-all duration-200 ${
                   splitVideoScreen
@@ -1406,6 +1413,7 @@ export default function CompositionDetail() {
                 musicKey={analysis.key ?? ""}
                 tempo={analysis.tempo ?? ""}
                 onVideoChange={handleVideoChange}
+                stopPlayingRef={stopPlayingRef}
               />
             </section>
 
