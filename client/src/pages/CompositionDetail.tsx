@@ -1101,8 +1101,43 @@ export default function CompositionDetail() {
             </button>
           </div>
 
-          {/* Resizable panels */}
-          <ResizablePanelGroup direction="horizontal" className="flex-1 min-h-0">
+          {/* Mobile: stacked vertical layout */}
+          <div className="flex md:hidden flex-col flex-1 min-h-0 overflow-hidden">
+            <div className="flex-1 min-h-0 overflow-auto bg-[oklch(0.11_0.016_265)] flex items-center justify-center p-3">
+              {isBuiltIn ? (
+                <div className="nocturne-card p-5 w-full text-center">
+                  <FileMusic size={28} className="text-[oklch(0.78_0.12_85)] mx-auto mb-3" />
+                  <p className="font-['Playfair_Display'] font-semibold text-base text-[oklch(0.88_0.01_85)] mb-1">La Campanella, S.141/3</p>
+                  <p className="text-xs text-[oklch(0.65_0.015_265)] mb-4">Open the public-domain score on IMSLP to follow along.</p>
+                  <a href="https://imslp.org/wiki/Grandes_%C3%A9tudes_de_Paganini,_S.141_(Liszt,_Franz)" target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-mono font-semibold bg-[oklch(0.78_0.12_85)] text-[oklch(0.12_0.018_265)] hover:bg-[oklch(0.85_0.12_85)] transition-colors">
+                    <FileMusic size={12} /> Open on IMSLP
+                  </a>
+                </div>
+              ) : (
+                <ScoreViewer fileUrl={scoreUrl!} mimeType={scoreMime} title={analysis?.title ?? composition?.title ?? ""} />
+              )}
+            </div>
+            <div className="h-1 bg-[oklch(0.20_0.016_265)] shrink-0" />
+            <div className="flex-1 min-h-0 bg-[oklch(0.10_0.016_265)] flex flex-col items-center justify-center p-3 gap-3">
+              {activePerformanceVideoId ? (
+                <>
+                  <div className="w-full rounded-xl overflow-hidden border border-[oklch(0.24_0.016_265)]" style={{ aspectRatio: "16/9" }}>
+                    <iframe src={`https://www.youtube.com/embed/${activePerformanceVideoId}?autoplay=1&rel=0&modestbranding=1`} title="Performance video" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowFullScreen className="w-full h-full" />
+                  </div>
+                  <p className="text-xs font-mono text-[oklch(0.50_0.012_265)] text-center">Select a video in <span className="text-[oklch(0.78_0.12_85)]">Featured Performance</span> below.</p>
+                </>
+              ) : (
+                <div className="nocturne-card p-5 w-full text-center">
+                  <Youtube size={28} className="text-[oklch(0.78_0.12_85)] mx-auto mb-3" />
+                  <p className="font-['Playfair_Display'] font-semibold text-base text-[oklch(0.88_0.01_85)] mb-1">No video selected</p>
+                  <p className="text-xs text-[oklch(0.65_0.015_265)]">Exit, scroll to Featured Performance, select a video, then return.</p>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Desktop: resizable side-by-side panels */}
+          <ResizablePanelGroup direction="horizontal" className="hidden md:flex flex-1 min-h-0">
             {/* Left: Score */}
             <ResizablePanel defaultSize={50} minSize={30}>
               <div className="h-full overflow-auto bg-[oklch(0.11_0.016_265)] flex items-center justify-center p-4">
