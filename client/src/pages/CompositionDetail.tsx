@@ -248,8 +248,8 @@ function extractYouTubeId(url: string): string | null {
 }
 
 function PerformanceVideoSection({
-  title, composer, musicKey = "", tempo = ""
-}: { title: string; composer: string; musicKey?: string; tempo?: string }) {
+  title, composer, musicKey = "", tempo = "", onVideoChange
+}: { title: string; composer: string; musicKey?: string; tempo?: string; onVideoChange?: (videoId: string | null) => void }) {
   const [selectedIdx, setSelectedIdx] = useState(0);
   const [playing, setPlaying] = useState(false);
 
@@ -293,6 +293,18 @@ function PerformanceVideoSection({
     setOverrideError("");
   };
 
+  // Determine which video to show — override takes priority
+  // (computed before early returns so hooks are always called in the same order)
+  const activeVideoId = overrideId ?? (videos[selectedIdx]?.videoId ?? videos[0]?.videoId);
+  const activeVideo = overrideId ? null : (videos[selectedIdx] ?? videos[0]);
+  const embedUrl = `https://www.youtube.com/embed/${activeVideoId}?autoplay=1&rel=0&modestbranding=1`;
+  const watchUrl = `https://www.youtube.com/watch?v=${activeVideoId}`;
+
+  // Lift active video ID to parent whenever it changes
+  useEffect(() => {
+    if (onVideoChange) onVideoChange(activeVideoId ?? null);
+  }, [activeVideoId, onVideoChange]);
+
   if (isLoading) {
     return (
       <div className="nocturne-card p-8 flex items-center gap-4">
@@ -310,12 +322,6 @@ function PerformanceVideoSection({
       </div>
     );
   }
-
-  // Determine which video to show — override takes priority
-  const activeVideoId = overrideId ?? (videos[selectedIdx]?.videoId ?? videos[0]?.videoId);
-  const activeVideo = overrideId ? null : (videos[selectedIdx] ?? videos[0]);
-  const embedUrl = `https://www.youtube.com/embed/${activeVideoId}?autoplay=1&rel=0&modestbranding=1`;
-  const watchUrl = `https://www.youtube.com/watch?v=${activeVideoId}`;
 
   return (
     <div className="space-y-5">
@@ -689,6 +695,9 @@ export default function CompositionDetail() {
 
   const [datePickerOpen, setDatePickerOpen] = useState(false);
   const [splitScreen, setSplitScreen] = useState(false);
+  const [splitVideoScreen, setSplitVideoScreen] = useState(false);
+  const [activePerformanceVideoId, setActivePerformanceVideoId] = useState<string | null>(null);
+  const handleVideoChange = useCallback((id: string | null) => setActivePerformanceVideoId(id), []);
   const [metronomeOpen, setMetronomeOpen] = useState(false);
 
   // Practice journal — per-day notes stored in localStorage
@@ -901,7 +910,7 @@ export default function CompositionDetail() {
             ))}
             {hasScore && (
               <button
-                onClick={() => setSplitScreen(s => !s)}
+                onClick={() => { setSplitScreen(s => !s); setSplitVideoScreen(false); }}
                 title={splitScreen ? "Exit split-screen" : isBuiltIn ? "Split-screen: IMSLP Score + Tracker" : "Split-screen: Score + Tracker"}
                 className={`ml-auto flex items-center gap-2 px-4 py-1.5 rounded-full text-xs font-mono border transition-all duration-200 ${
                   splitScreen
@@ -911,6 +920,21 @@ export default function CompositionDetail() {
               >
                 {splitScreen ? <PanelLeftClose size={13} /> : <Columns2 size={13} />}
                 {splitScreen ? "Exit Split" : "Split Screen"}
+              </button>
+            )}
+            {/* Score + Video split-screen button */}
+            {hasScore && (
+              <button
+                onClick={() => { setSplitVideoScreen(s => !s); setSplitScreen(false); }}
+                title={splitVideoScreen ? "Exit score + video split" : "Split-screen: Score + Video"}
+                className={`flex items-center gap-2 px-4 py-1.5 rounded-full text-xs font-mono border transition-all duration-200 ${
+                  splitVideoScreen
+                    ? "bg-[oklch(0.78_0.12_85/0.15)] border-[oklch(0.78_0.12_85/0.6)] text-[oklch(0.78_0.12_85)]"
+                    : "border-[oklch(0.30_0.018_265)] text-[oklch(0.72_0.015_265)] hover:border-[oklch(0.78_0.12_85/0.5)] hover:text-[oklch(0.78_0.12_85)]"
+                }`}
+              >
+                {splitVideoScreen ? <PanelLeftClose size={13} /> : <Youtube size={13} />}
+                {splitVideoScreen ? "Exit" : "Score + Video"}
               </button>
             )}
           </div>
@@ -1058,8 +1082,94 @@ export default function CompositionDetail() {
         </div>
       )}
 
+      {/* ── SCORE + VIDEO SPLIT-SCREEN MODE ─────────────────────────────── */}
+      {splitVideoScreen && hasScore && scoreUrl && (
+        <div className="fixed inset-0 top-0 z-50 bg-[oklch(0.10_0.016_265)] flex flex-col">
+          {/* Top bar */}
+          <div className="flex items-center justify-between px-4 py-2 border-b border-[oklch(0.22_0.016_265)] bg-[oklch(0.13_0.018_265)] shrink-0">
+            <div className="flex items-center gap-3">
+              <img src={LOGO_TREBLE} alt="" className="h-5 w-auto" />
+              <span className="font-['Playfair_Display'] text-sm text-[oklch(0.78_0.12_85)]">{analysis.title}</span>
+              <span className="text-[oklch(0.35_0.014_265)] text-xs font-mono">·</span>
+              <span className="text-[oklch(0.68_0.012_265)] text-xs font-mono">Score + Video Mode</span>
+            </div>
+            <button
+              onClick={() => setSplitVideoScreen(false)}
+              className="flex items-center gap-2 px-3 py-1.5 rounded text-xs font-mono border border-[oklch(0.30_0.018_265)] text-[oklch(0.72_0.015_265)] hover:border-[oklch(0.78_0.12_85/0.5)] hover:text-[oklch(0.78_0.12_85)] transition-all"
+            >
+              <PanelLeftClose size={12} /> Exit
+            </button>
+          </div>
+
+          {/* Resizable panels */}
+          <ResizablePanelGroup direction="horizontal" className="flex-1 min-h-0">
+            {/* Left: Score */}
+            <ResizablePanel defaultSize={50} minSize={30}>
+              <div className="h-full overflow-auto bg-[oklch(0.11_0.016_265)] flex items-center justify-center p-4">
+                {isBuiltIn ? (
+                  <div className="nocturne-card p-8 max-w-md w-full text-center">
+                    <FileMusic size={40} className="text-[oklch(0.78_0.12_85)] mx-auto mb-4" />
+                    <p className="font-['Playfair_Display'] font-semibold text-xl text-[oklch(0.88_0.01_85)] mb-2">La Campanella, S.141/3</p>
+                    <p className="text-sm text-[oklch(0.65_0.015_265)] mb-6">Open the public-domain score on IMSLP in a separate tab to follow along.</p>
+                    <a
+                      href="https://imslp.org/wiki/Grandes_%C3%A9tudes_de_Paganini,_S.141_(Liszt,_Franz)"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-2 px-5 py-2.5 rounded-lg text-sm font-mono font-semibold bg-[oklch(0.78_0.12_85)] text-[oklch(0.12_0.018_265)] hover:bg-[oklch(0.85_0.12_85)] transition-colors"
+                    >
+                      <FileMusic size={14} /> Open on IMSLP
+                    </a>
+                  </div>
+                ) : (
+                  <ScoreViewer
+                    fileUrl={scoreUrl!}
+                    mimeType={scoreMime}
+                    title={analysis?.title ?? composition?.title ?? ""}
+                  />
+                )}
+              </div>
+            </ResizablePanel>
+
+            {/* Divider */}
+            <ResizableHandle
+              withHandle
+              className="w-1.5 bg-[oklch(0.20_0.016_265)] hover:bg-[oklch(0.78_0.12_85/0.3)] transition-colors data-[resize-handle-active]:bg-[oklch(0.78_0.12_85/0.5)]"
+            />
+
+            {/* Right: YouTube video */}
+            <ResizablePanel defaultSize={50} minSize={30}>
+              <div className="h-full bg-[oklch(0.10_0.016_265)] flex flex-col items-center justify-center p-4 gap-4">
+                {activePerformanceVideoId ? (
+                  <>
+                    <div className="w-full flex-1 min-h-0 rounded-xl overflow-hidden border border-[oklch(0.24_0.016_265)]">
+                      <iframe
+                        src={`https://www.youtube.com/embed/${activePerformanceVideoId}?autoplay=1&rel=0&modestbranding=1`}
+                        title="Performance video"
+                        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                        allowFullScreen
+                        className="w-full h-full"
+                        style={{ minHeight: "240px" }}
+                      />
+                    </div>
+                    <p className="text-xs font-mono text-[oklch(0.50_0.012_265)] text-center">
+                      Select a different video in the <span className="text-[oklch(0.78_0.12_85)]">Featured Performance</span> section below.
+                    </p>
+                  </>
+                ) : (
+                  <div className="nocturne-card p-8 max-w-sm w-full text-center">
+                    <Youtube size={36} className="text-[oklch(0.78_0.12_85)] mx-auto mb-4" />
+                    <p className="font-['Playfair_Display'] font-semibold text-lg text-[oklch(0.88_0.01_85)] mb-2">No video selected</p>
+                    <p className="text-sm text-[oklch(0.65_0.015_265)]">Exit this view, scroll to the <strong>Featured Performance</strong> section, and select a video. Then return to Score + Video mode.</p>
+                  </div>
+                )}
+              </div>
+            </ResizablePanel>
+          </ResizablePanelGroup>
+        </div>
+      )}
+
       {/* ── NORMAL LAYOUT ─────────────────────────────────────────────────── */}
-      <div className={splitScreen ? "hidden" : "flex"}>
+      <div className={splitScreen || splitVideoScreen ? "hidden" : "flex"}>
         {/* Sidebar */}
         <aside className="hidden lg:flex flex-col w-64 shrink-0 sticky top-0 h-screen overflow-y-auto border-r border-[oklch(0.24_0.016_265)] bg-[oklch(0.14_0.018_265)] py-10 px-6">
           <div className="flex items-center gap-2 mb-10">
@@ -1260,6 +1370,7 @@ export default function CompositionDetail() {
                 composer={analysis.composer}
                 musicKey={analysis.key ?? ""}
                 tempo={analysis.tempo ?? ""}
+                onVideoChange={handleVideoChange}
               />
             </section>
 
