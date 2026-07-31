@@ -23,3 +23,10 @@
 - [x] Add practice journal/notes field (localStorage-backed, 30-day grid)
 - [x] Add difficulty breakdown by section with animated bars
 - [x] Add edition/publication notes (3 editions: 1834, 1838, 1851)
+
+## HTML File Support
+- [x] Accept .html/.htm files in the upload drag-and-drop zone (file input accept attribute)
+- [x] Add paste handler (Ctrl/Cmd+V) to upload zone — handles clipboard files, HTML content, plain text
+- [x] Add pasting state visual feedback and keyboard focus (tabIndex=0) to upload zone
+- [x] Update hint text to show HTML and keyboard shortcut
+- [x] Server-side: strip HTML tags, style/script blocks, decode entities for LLM analysis (text/html + text/plain MIME types)

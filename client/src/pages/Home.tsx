@@ -454,8 +454,8 @@ function NavBar() {
 // ── PDF text extraction (client-side, best-effort) ───────────────────────────
 async function extractTextFromFile(file: File): Promise<string> {
   // Text extraction from PDF/images is now done server-side via pdftotext.
-  // For plain text files, we can still read them directly.
-  if (file.type === "text/plain") {
+  // For plain text files and HTML files, we can still read them directly.
+  if (file.type === "text/plain" || file.type === "text/html") {
     try { return await file.text(); } catch { /* ignore */ }
   }
   return "";
@@ -509,6 +509,7 @@ function StatusBadge({ status }: { status: string }) {
 // ── Upload Zone ───────────────────────────────────────────────────────────────
 function UploadZone({ onUpload }: { onUpload: (file: File) => void }) {
   const [dragging, setDragging] = useState(false);
+  const [pasting, setPasting] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
   const handleDrop = useCallback(
@@ -527,14 +528,48 @@ function UploadZone({ onUpload }: { onUpload: (file: File) => void }) {
     e.target.value = "";
   };
 
+  // Handle paste from clipboard (Ctrl/Cmd+V)
+  const handlePaste = useCallback(
+    (e: React.ClipboardEvent) => {
+      // Check for files first (e.g. a file copied in Finder)
+      const file = e.clipboardData.files[0];
+      if (file) {
+        onUpload(file);
+        return;
+      }
+      // Check for HTML content pasted from browser/editor
+      const html = e.clipboardData.getData("text/html");
+      if (html && html.trim().length > 0) {
+        setPasting(true);
+        const blob = new Blob([html], { type: "text/html" });
+        const htmlFile = new File([blob], "pasted-score.html", { type: "text/html" });
+        onUpload(htmlFile);
+        setTimeout(() => setPasting(false), 1500);
+        return;
+      }
+      // Fall back to plain text
+      const text = e.clipboardData.getData("text/plain");
+      if (text && text.trim().length > 0) {
+        setPasting(true);
+        const blob = new Blob([text], { type: "text/plain" });
+        const textFile = new File([blob], "pasted-score.txt", { type: "text/plain" });
+        onUpload(textFile);
+        setTimeout(() => setPasting(false), 1500);
+      }
+    },
+    [onUpload]
+  );
+
   return (
     <div
       onDragOver={(e) => { e.preventDefault(); setDragging(true); }}
       onDragLeave={() => setDragging(false)}
       onDrop={handleDrop}
+      onPaste={handlePaste}
       onClick={() => inputRef.current?.click()}
-        className={`relative cursor-pointer rounded-2xl border-2 border-dashed transition-all duration-300 p-6 sm:p-12 text-center group
-        ${dragging
+      tabIndex={0}
+        className={`relative cursor-pointer rounded-2xl border-2 border-dashed transition-all duration-300 p-6 sm:p-12 text-center group outline-none focus:ring-2 focus:ring-[oklch(0.78_0.12_85/0.5)]
+        ${dragging || pasting
           ? "border-[oklch(0.78_0.12_85)] bg-[oklch(0.78_0.12_85/0.06)] scale-[1.01]"
           : "border-[oklch(0.30_0.018_265)] hover:border-[oklch(0.55_0.08_85)] hover:bg-[oklch(0.78_0.12_85/0.03)]"
         }`}
@@ -542,7 +577,7 @@ function UploadZone({ onUpload }: { onUpload: (file: File) => void }) {
       <input
         ref={inputRef}
         type="file"
-        accept=".pdf,.png,.jpg,.jpeg,.webp,.tiff,.bmp"
+        accept=".pdf,.png,.jpg,.jpeg,.webp,.tiff,.bmp,.html,.htm"
         className="hidden"
         onChange={handleChange}
       />
@@ -566,13 +601,16 @@ function UploadZone({ onUpload }: { onUpload: (file: File) => void }) {
 
           <div>
             <p className="font-['Playfair_Display'] text-base sm:text-xl font-semibold text-[oklch(0.88_0.01_85)] mb-1.5 sm:mb-2">
-              {dragging ? "Release to upload" : "Drop your piano score here"}
+              {pasting ? "Pasting…" : dragging ? "Release to upload" : "Drop your piano score here"}
             </p>
             <p className="text-sm text-[oklch(0.72_0.015_265)] mb-1">
               or <span className="text-[oklch(0.78_0.12_85)] underline underline-offset-2">click to browse</span>
             </p>
             <p className="text-xs text-[oklch(0.40_0.012_265)]">
-              PDF, PNG, JPG, WEBP
+              PDF, PNG, JPG, WEBP, HTML
+            </p>
+            <p className="text-xs text-[oklch(0.35_0.012_265)] mt-1">
+              or <kbd className="px-1.5 py-0.5 rounded text-[0.65rem] border border-[oklch(0.28_0.016_265)] bg-[oklch(0.14_0.010_265)] font-mono">⌘V</kbd> / <kbd className="px-1.5 py-0.5 rounded text-[0.65rem] border border-[oklch(0.28_0.016_265)] bg-[oklch(0.14_0.010_265)] font-mono">Ctrl+V</kbd> to paste
             </p>
           </div>
 

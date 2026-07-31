@@ -187,6 +187,21 @@ export async function analyzeComposition(
     console.log(`[Analysis] Extracting text from PDF: ${fileName}`);
     extractedText = await extractPdfText(fileBuffer);
     console.log(`[Analysis] Extracted ${extractedText.length} chars from PDF`);
+  } else if (mimeType === "text/html" || mimeType === "text/plain") {
+    // Strip HTML tags and decode entities for plain text extraction
+    const raw = fileBuffer.toString("utf-8");
+    extractedText = raw
+      .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, "")
+      .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, "")
+      .replace(/<[^>]+>/g, " ")
+      .replace(/&nbsp;/g, " ")
+      .replace(/&amp;/g, "&")
+      .replace(/&lt;/g, "<")
+      .replace(/&gt;/g, ">")
+      .replace(/&quot;/g, '"')
+      .replace(/\s{2,}/g, " ")
+      .trim();
+    console.log(`[Analysis] Extracted ${extractedText.length} chars from HTML/text`);
   }
 
   // 2. Clean up the filename to use as a hint
