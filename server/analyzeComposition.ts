@@ -244,17 +244,24 @@ ${JSON_SCHEMA}`;
   console.log(`[Analysis] Calling LLM for: ${fileNameHint}`);
 
   const response = await invokeLLM({
-    model: "gpt-5-mini",
+    model: "claude-haiku-4-5",
     messages: [
       { role: "system", content: systemPrompt },
       { role: "user", content: userPrompt },
     ],
-    response_format: { type: "json_object" },
     max_tokens: 8000,
   });
 
-  const content = response.choices[0]?.message?.content as string | undefined;
-  if (!content) {
+  const rawContent = response.choices[0]?.message?.content;
+  const content = typeof rawContent === "string" ? rawContent
+    : Array.isArray(rawContent)
+      ? (rawContent as Array<{type:string;text?:string}>)
+          .filter(b => b.type === "text")
+          .map(b => b.text ?? "")
+          .join("")
+      : undefined;
+
+  if (!content || content.trim().length === 0) {
     throw new Error("AI returned an empty response. Please try again.");
   }
 
