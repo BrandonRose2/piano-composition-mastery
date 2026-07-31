@@ -435,6 +435,79 @@ export const appRouter = router({
       }),
   }),
 
+  /**
+   * Fetch a webpage URL server-side, extract its text content, and kick off AI analysis.
+   * Used when the user pastes a URL into the upload zone instead of uploading a file.
+   */
+  fetchFromUrl: protectedProcedure
+    .input(
+      z.object({
+        url: z.string().url("Please enter a valid URL (e.g. https://example.com)"),
+        titleHint: z.string().optional().default(""),
+      })
+    )
+    .mutation(async ({ input, ctx }) => {
+      const userId = ctx.user.id;
+
+      // Fetch the page
+      const response = await fetch(input.url, {
+        headers: {
+          "User-Agent": "Mozilla/5.0 (compatible; PianoMasteryPortal/1.0; educational use)",
+          "Accept": "text/html,application/xhtml+xml,*/*",
+        },
+        redirect: "follow",
+        signal: AbortSignal.timeout(15_000),
+      });
+
+      if (!response.ok) {
+        throw new Error(`Could not fetch URL (HTTP ${response.status}). Make sure the link is publicly accessible.`);
+      }
+
+      const rawText = await response.text();
+
+      // Determine filename from URL path
+      let urlPath = "";
+      try { urlPath = new URL(input.url).hostname; } catch { urlPath = "webpage"; }
+      const fileName = `${urlPath}.html`;
+      const title = input.titleHint || urlPath.replace(/^www\./, "").replace(/[-_.]/g, " ");
+
+      // Store the raw HTML as a file in S3 so the composition record has a fileUrl
+      const buffer = Buffer.from(rawText, "utf-8");
+      const key = `compositions/${userId}/${Date.now()}-${fileName.replace(/[^a-zA-Z0-9._-]/g, "_")}`;
+      const { url: fileUrl } = await storagePut(key, buffer, "text/html");
+
+      const composition = await createComposition({
+        userId,
+        title,
+        fileName,
+        fileKey: key,
+        fileUrl,
+        mimeType: "text/html",
+        status: "pending",
+      });
+
+      if (!composition) throw new Error("Failed to create composition record");
+
+      const compositionId = composition.id;
+      const fileBuffer = buffer;
+
+      setTimeout(async () => {
+        try {
+          console.log(`[Analysis] Starting URL analysis for composition ${compositionId}: ${input.url}`);
+          await updateCompositionStatus(compositionId, "analyzing");
+          const { analysis, framework } = await analyzeComposition(fileName, fileBuffer, "text/html");
+          await updateCompositionStatus(compositionId, "complete", { analysis, framework });
+          console.log(`[Analysis] URL analysis completed for composition ${compositionId}`);
+        } catch (err) {
+          const errMsg = err instanceof Error ? err.message : String(err);
+          console.error(`[Analysis] URL analysis failed for composition ${compositionId}:`, errMsg);
+          await updateCompositionStatus(compositionId, "error", { errorMessage: errMsg }).catch(() => {});
+        }
+      }, 0);
+
+      return { id: composition.id, title };
+    }),
+
   progress: router({
     /** Summarise progress for ALL of the current user's compositions in one call */
     summaryAll: protectedProcedure.query(async ({ ctx }) => {

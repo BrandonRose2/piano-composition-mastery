@@ -8,7 +8,7 @@ import { useState, useCallback, useRef, useEffect } from "react";
 import { useLocation } from "wouter";
 import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
-import { Music, Upload, BookOpen, ChevronRight, Loader2, AlertCircle, CheckCircle2, Clock, Trash2, Youtube, ExternalLink, LogOut, User, Search, FileText, X, Download, Import } from "lucide-react";
+import { Music, Upload, BookOpen, ChevronRight, Loader2, AlertCircle, CheckCircle2, Clock, Trash2, Youtube, ExternalLink, LogOut, User, Search, FileText, X, Download, Import, Link } from "lucide-react";
 import { useAuth } from "@/_core/hooks/useAuth";
 
 // ── Asset URLs ────────────────────────────────────────────────────────────────
@@ -873,6 +873,35 @@ export default function Home() {
     progressSummaries.map((s) => [s.compositionId, s])
   );
 
+  const fetchFromUrlMutation = trpc.fetchFromUrl.useMutation({
+    onSuccess: () => {
+      utils.compositions.list.invalidate();
+      toast.success("Page fetched! AI analysis is running — it will be ready in about 30 seconds.");
+    },
+    onError: (err) => {
+      toast.error("URL fetch failed: " + err.message);
+    },
+  });
+
+  const [urlInput, setUrlInput] = useState("");
+  const [fetchingUrl, setFetchingUrl] = useState(false);
+
+  const handleFetchUrl = useCallback(async () => {
+    const raw = urlInput.trim();
+    if (!raw) return;
+    // Auto-prepend https:// if missing
+    const url = /^https?:\/\//i.test(raw) ? raw : `https://${raw}`;
+    setFetchingUrl(true);
+    try {
+      await fetchFromUrlMutation.mutateAsync({ url });
+      setUrlInput("");
+    } catch {
+      // error handled by onError
+    } finally {
+      setFetchingUrl(false);
+    }
+  }, [urlInput, fetchFromUrlMutation]);
+
   const uploadMutation = trpc.compositions.upload.useMutation({
     onSuccess: () => {
       utils.compositions.list.invalidate();
@@ -970,16 +999,55 @@ export default function Home() {
             <span className="text-[oklch(0.78_0.12_85)]">♪</span>
           </div>
 
-          {uploading ? (
+          {uploading || fetchingUrl ? (
             <div className="rounded-2xl border-2 border-dashed border-[oklch(0.78_0.12_85/0.4)] p-12 text-center">
               <div className="flex flex-col items-center gap-4">
                 <Loader2 size={40} className="text-[oklch(0.78_0.12_85)] animate-spin" />
-                <p className="font-['Playfair_Display'] text-xl text-[oklch(0.88_0.01_85)]">Uploading your score…</p>
-                <p className="text-sm text-[oklch(0.72_0.015_265)]">Sending to AI for analysis</p>
+                <p className="font-['Playfair_Display'] text-xl text-[oklch(0.88_0.01_85)]">
+                  {fetchingUrl ? "Fetching page…" : "Uploading your score…"}
+                </p>
+                <p className="text-sm text-[oklch(0.72_0.015_265)]">
+                  {fetchingUrl ? "Reading the page and sending to AI" : "Sending to AI for analysis"}
+                </p>
               </div>
             </div>
           ) : (
-            <UploadZone onUpload={handleUpload} />
+            <>
+              <UploadZone onUpload={handleUpload} />
+
+              {/* URL input row */}
+              <div className="mt-4 flex items-center gap-2">
+                <div className="flex-1 flex items-center gap-2 rounded-xl border border-[oklch(0.28_0.016_265)] bg-[oklch(0.14_0.010_265)] px-3 py-2.5 focus-within:border-[oklch(0.55_0.08_85)] transition-colors">
+                  <Link size={14} className="shrink-0 text-[oklch(0.45_0.015_265)]" />
+                  <input
+                    type="url"
+                    value={urlInput}
+                    onChange={(e) => setUrlInput(e.target.value)}
+                    onKeyDown={(e) => e.key === "Enter" && handleFetchUrl()}
+                    placeholder="Paste a website URL to analyze (e.g. https://imslp.org/wiki/...)"
+                    className="flex-1 bg-transparent text-sm text-[oklch(0.88_0.01_85)] placeholder:text-[oklch(0.38_0.012_265)] outline-none min-w-0"
+                  />
+                  {urlInput && (
+                    <button
+                      onClick={() => setUrlInput("")}
+                      className="shrink-0 text-[oklch(0.40_0.012_265)] hover:text-[oklch(0.65_0.015_265)] transition-colors"
+                    >
+                      <X size={13} />
+                    </button>
+                  )}
+                </div>
+                <button
+                  onClick={handleFetchUrl}
+                  disabled={!urlInput.trim()}
+                  className="shrink-0 px-4 py-2.5 rounded-xl bg-[oklch(0.78_0.12_85)] text-[oklch(0.12_0.018_265)] text-sm font-semibold disabled:opacity-40 disabled:cursor-not-allowed hover:bg-[oklch(0.85_0.12_85)] active:scale-[0.97] transition-all duration-150"
+                >
+                  Analyze URL
+                </button>
+              </div>
+              <p className="mt-2 text-xs text-[oklch(0.38_0.012_265)] text-center">
+                Or paste a link to any public webpage — the portal will fetch and analyze its content
+              </p>
+            </>
           )}
         </div>
 

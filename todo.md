@@ -30,3 +30,9 @@
 - [x] Add pasting state visual feedback and keyboard focus (tabIndex=0) to upload zone
 - [x] Update hint text to show HTML and keyboard shortcut
 - [x] Server-side: strip HTML tags, style/script blocks, decode entities for LLM analysis (text/html + text/plain MIME types)
+
+## URL Fetch from Upload Zone
+- [x] Add URL input field below the drag-and-drop zone so users can paste a website URL
+- [x] Add fetchFromUrl tRPC procedure: server fetches the URL, stores HTML in S3, kicks off AI analysis
+- [x] Wire URL input submit to the same upload/analyze flow as file uploads
+- [x] Show loading state while fetching URL ("Fetching page..." spinner)
