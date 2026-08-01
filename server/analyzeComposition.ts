@@ -265,11 +265,19 @@ ${JSON_SCHEMA}`;
     throw new Error("AI returned an empty response. Please try again.");
   }
 
-  // Strip markdown code fences if present
-  const cleaned = content
+  // Strip markdown code fences if present, then extract the JSON object
+  // Claude sometimes prefixes with a thinking sentence before the JSON block.
+  let cleaned = content
     .replace(/^```(?:json)?\s*/i, "")
     .replace(/\s*```\s*$/i, "")
     .trim();
+
+  // Find the outermost JSON object by locating the first '{' and last '}'
+  const firstBrace = cleaned.indexOf("{");
+  const lastBrace = cleaned.lastIndexOf("}");
+  if (firstBrace !== -1 && lastBrace > firstBrace) {
+    cleaned = cleaned.slice(firstBrace, lastBrace + 1);
+  }
 
   let parsed: { analysis: CompositionAnalysis; framework: CompositionFramework };
   try {

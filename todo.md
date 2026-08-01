@@ -48,3 +48,9 @@
 - [x] Frontend: show step-by-step progress animation while searching
 - [x] Frontend: show result cards with source badge, confidence, preview link, and Import button
 - [x] Backend: importSheetMusicResult mutation fetches the PDF and adds it to the user's library with AI analysis
+
+## Scribd Direct Download
+- [ ] Backend: downloadFromScribd procedure — fetch Scribd document page with session cookie, extract PDF download URL from page HTML/JSON
+- [ ] Backend: download the PDF bytes server-side, store in S3, create composition record, kick off AI analysis
+- [ ] Frontend: Scribd result cards show "Download & Import" button that calls the new procedure
+- [ ] Frontend: show progress state while downloading from Scribd

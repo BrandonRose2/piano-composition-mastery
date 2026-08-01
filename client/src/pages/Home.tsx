@@ -712,29 +712,40 @@ function YouTubeSheetMusicFinder() {
                     <p className="text-sm text-[oklch(0.88_0.01_85)] font-medium truncate mb-0.5">{src.title}</p>
                     {src.notes && <p className="text-xs text-[oklch(0.50_0.012_265)]">{src.notes}</p>}
                   </div>
-                  <div className="flex items-center gap-2 shrink-0">
-                    <a
-                      href={src.previewUrl ?? src.url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="flex items-center gap-1 text-xs text-[oklch(0.55_0.015_265)] hover:text-[oklch(0.78_0.12_85)] transition-colors px-2 py-1.5 rounded-lg border border-[oklch(0.25_0.012_265)] hover:border-[oklch(0.78_0.12_85/0.4)]"
-                    >
-                      <ExternalLink size={11} /> Open
-                    </a>
-                    {isImported ? (
-                      <span className="flex items-center gap-1 text-xs text-emerald-400 px-2 py-1.5">
-                        <Check size={11} /> Imported
-                      </span>
-                    ) : canImport ? (
-                      <button
-                        onClick={() => handleImport(src)}
-                        disabled={isImporting}
-                        className="flex items-center gap-1 text-xs bg-[oklch(0.78_0.12_85)] text-[oklch(0.12_0.018_265)] font-semibold px-3 py-1.5 rounded-lg hover:bg-[oklch(0.85_0.12_85)] active:scale-[0.97] disabled:opacity-50 transition-all duration-150"
+                  <div className="flex flex-col items-end gap-1.5 shrink-0">
+                    <div className="flex items-center gap-2">
+                      <a
+                        href={src.previewUrl ?? src.url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex items-center gap-1 text-xs text-[oklch(0.55_0.015_265)] hover:text-[oklch(0.78_0.12_85)] transition-colors px-2 py-1.5 rounded-lg border border-[oklch(0.25_0.012_265)] hover:border-[oklch(0.78_0.12_85/0.4)]"
                       >
-                        {isImporting ? <Loader2 size={11} className="animate-spin" /> : <Download size={11} />}
-                        {isImporting ? "Importing…" : "Import"}
-                      </button>
-                    ) : null}
+                        <ExternalLink size={11} />
+                        {src.source === "scribd" ? "Open in Scribd" :
+                         src.source === "imslp" ? "Open IMSLP" :
+                         src.source === "musescore" ? "Browse MuseScore" : "Open"}
+                      </a>
+                      {isImported ? (
+                        <span className="flex items-center gap-1 text-xs text-emerald-400 px-2 py-1.5">
+                          <Check size={11} /> Imported
+                        </span>
+                      ) : canImport ? (
+                        <button
+                          onClick={() => handleImport(src)}
+                          disabled={isImporting}
+                          className="flex items-center gap-1 text-xs bg-[oklch(0.78_0.12_85)] text-[oklch(0.12_0.018_265)] font-semibold px-3 py-1.5 rounded-lg hover:bg-[oklch(0.85_0.12_85)] active:scale-[0.97] disabled:opacity-50 transition-all duration-150"
+                        >
+                          {isImporting ? <Loader2 size={11} className="animate-spin" /> : <Download size={11} />}
+                          {isImporting ? "Importing…" : "Import"}
+                        </button>
+                      ) : null}
+                    </div>
+                    {/* Scribd / IMSLP: guide user to download then drag back */}
+                    {(src.source === "scribd" || src.source === "imslp") && !isImported && (
+                      <p className="text-[0.6rem] text-[oklch(0.38_0.012_265)] text-right leading-tight max-w-[160px]">
+                        Download the PDF, then drag it into the upload zone above
+                      </p>
+                    )}
                   </div>
                 </div>
               );
