@@ -50,7 +50,7 @@
 - [x] Backend: importSheetMusicResult mutation fetches the PDF and adds it to the user's library with AI analysis
 
 ## Scribd Direct Download
-- [ ] Backend: downloadFromScribd procedure — fetch Scribd document page with session cookie, extract PDF download URL from page HTML/JSON
-- [ ] Backend: download the PDF bytes server-side, store in S3, create composition record, kick off AI analysis
-- [ ] Frontend: Scribd result cards show "Download & Import" button that calls the new procedure
-- [ ] Frontend: show progress state while downloading from Scribd
+- [x] Backend: investigated Scribd document pages — pages are fully JS-rendered (3KB HTML server-side), no PDF URL extractable without headless browser
+- [x] Backend: PDF validation added to importSheetMusicResult (content-type + magic bytes check)
+- [x] Frontend: Scribd result cards show "Open in Scribd" button + micro-tip "Download the PDF, then drag it into the upload zone above"
+- [x] Frontend: IMSLP shows "Open IMSLP", MuseScore shows "Browse MuseScore" with same drag-back guidance

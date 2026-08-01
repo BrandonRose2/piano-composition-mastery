@@ -740,8 +740,8 @@ function YouTubeSheetMusicFinder() {
                         </button>
                       ) : null}
                     </div>
-                    {/* Scribd / IMSLP: guide user to download then drag back */}
-                    {(src.source === "scribd" || src.source === "imslp") && !isImported && (
+                    {/* Scribd / IMSLP / MuseScore: guide user to download then drag back */}
+                    {(src.source === "scribd" || src.source === "imslp" || src.source === "musescore") && !isImported && (
                       <p className="text-[0.6rem] text-[oklch(0.38_0.012_265)] text-right leading-tight max-w-[160px]">
                         Download the PDF, then drag it into the upload zone above
                       </p>
