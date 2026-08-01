@@ -36,3 +36,15 @@
 - [x] Add fetchFromUrl tRPC procedure: server fetches the URL, stores HTML in S3, kicks off AI analysis
 - [x] Wire URL input submit to the same upload/analyze flow as file uploads
 - [x] Show loading state while fetching URL ("Fetching page..." spinner)
+
+## YouTube → Sheet Music Finder
+- [x] Add "Find Sheet Music from YouTube" section on Home page with URL input (paste or drag a YouTube URL)
+- [x] Backend: extract YouTube video ID and fetch video metadata (title, description, channel) via YouTube Data API / callDataApi
+- [x] Backend: parse video title/description to identify composition name and composer
+- [x] Backend: search Scribd for the composition PDF (authenticated with session cookie)
+- [x] Backend: scrape YouTube video description and top comments for PDF/sheet music links
+- [x] Backend: fallback search IMSLP and MuseScore for free scores
+- [x] Backend: return ranked list of found PDF sources with source label (Scribd / YouTube description / YouTube comments / IMSLP / MuseScore)
+- [x] Frontend: show step-by-step progress animation while searching
+- [x] Frontend: show result cards with source badge, confidence, preview link, and Import button
+- [x] Backend: importSheetMusicResult mutation fetches the PDF and adds it to the user's library with AI analysis

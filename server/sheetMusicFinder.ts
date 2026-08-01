@@ -1,0 +1,384 @@
+/**
+ * Sheet Music Finder Pipeline
+ * Given a YouTube URL:
+ *  1. Extract video metadata (title, description, channel)
+ *  2. Use AI to identify the composition name + composer
+ *  3. Search Scribd (authenticated with session cookie)
+ *  4. Scan YouTube description + top comments for PDF links
+ *  5. Fallback: search IMSLP and MuseScore
+ * Returns a ranked list of PDF sources.
+ */
+
+import { invokeLLM } from "./_core/llm";
+import { callDataApi } from "./_core/dataApi";
+
+// ── Types ─────────────────────────────────────────────────────────────────────
+
+export interface SheetMusicResult {
+  source: "scribd" | "youtube_description" | "youtube_comments" | "imslp" | "musescore" | "web";
+  title: string;
+  url: string;
+  pdfUrl?: string;           // direct PDF download URL if available
+  previewUrl?: string;       // page to open in browser
+  canImportDirectly: boolean; // true only when pdfUrl is a verified direct PDF
+  confidence: "high" | "medium" | "low";
+  notes?: string;
+}
+
+export interface FinderResult {
+  videoId: string;
+  videoTitle: string;
+  compositionName: string;
+  composer: string;
+  sources: SheetMusicResult[];
+  error?: string;
+}
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
+
+/** Extract YouTube video ID from any YouTube URL format */
+export function extractVideoId(url: string): string | null {
+  const patterns = [
+    /(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/|youtube\.com\/shorts\/)([a-zA-Z0-9_-]{11})/,
+    /^([a-zA-Z0-9_-]{11})$/,
+  ];
+  for (const p of patterns) {
+    const m = url.match(p);
+    if (m) return m[1];
+  }
+  return null;
+}
+
+/** Fetch YouTube video metadata via the Data API */
+async function getVideoMetadata(videoId: string): Promise<{
+  title: string;
+  description: string;
+  channelTitle: string;
+} | null> {
+  try {
+    const result = await callDataApi("Youtube/video_details", {
+      query: { videoId },
+    }) as any;
+
+    const video = result?.video ?? result;
+    const title = video?.title ?? video?.videoDetails?.title ?? "";
+    const description = video?.description ?? video?.videoDetails?.shortDescription ?? "";
+    const channelTitle = video?.channelTitle ?? video?.videoDetails?.author ?? "";
+
+    if (!title) return null;
+    return { title, description, channelTitle };
+  } catch (err) {
+    console.error("[SheetFinder] Failed to get video metadata:", err);
+    return null;
+  }
+}
+
+/** Use AI to extract composition name and composer from video title/description */
+async function identifyComposition(
+  videoTitle: string,
+  description: string,
+  channelTitle: string
+): Promise<{ compositionName: string; composer: string }> {
+  const prompt = `You are a music expert. Given the following YouTube video information, identify the piano composition being performed.
+
+VIDEO TITLE: "${videoTitle}"
+CHANNEL: "${channelTitle}"
+DESCRIPTION (first 500 chars): "${description.slice(0, 500)}"
+
+Extract:
+1. The exact composition name (e.g. "Nocturne in E-flat major, Op. 9 No. 2")
+2. The composer's full name (e.g. "Frédéric Chopin")
+
+Respond ONLY with a JSON object: {"compositionName": "...", "composer": "..."}
+If you cannot identify the piece, use your best guess from the title.`;
+
+  try {
+    const response = await invokeLLM({
+      model: "claude-haiku-4-5",
+      messages: [{ role: "user", content: prompt }],
+      max_tokens: 200,
+    });
+    const raw = response.choices[0]?.message?.content;
+    const text = typeof raw === "string" ? raw
+      : Array.isArray(raw) ? (raw as any[]).filter(b => b.type === "text").map(b => b.text).join("") : "";
+    const cleaned = text.replace(/```(?:json)?\s*/gi, "").replace(/```/g, "").trim();
+    const parsed = JSON.parse(cleaned);
+    return {
+      compositionName: parsed.compositionName ?? videoTitle,
+      composer: parsed.composer ?? "Unknown",
+    };
+  } catch {
+    // Fallback: use video title as composition name
+    return { compositionName: videoTitle, composer: "Unknown" };
+  }
+}
+
+/** Search Scribd for sheet music using the session cookie */
+async function searchScribd(
+  compositionName: string,
+  composer: string,
+  sessionCookie: string
+): Promise<SheetMusicResult[]> {
+  const results: SheetMusicResult[] = [];
+  const queries = [
+    `${composer} ${compositionName} piano sheet music`,
+    `${compositionName} piano score pdf`,
+    `${composer} ${compositionName} score`,
+  ];
+
+  for (const query of queries.slice(0, 2)) {
+    try {
+      const encodedQuery = encodeURIComponent(query);
+      const url = `https://www.scribd.com/search?query=${encodedQuery}&content_type=documents`;
+      const res = await fetch(url, {
+        headers: {
+          "Cookie": `_scribd_session=${sessionCookie}`,
+          "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+          "Accept": "text/html,application/xhtml+xml,*/*",
+          "Accept-Language": "en-US,en;q=0.9",
+          "Referer": "https://www.scribd.com/",
+        },
+        redirect: "follow",
+        signal: AbortSignal.timeout(10_000),
+      });
+
+      if (!res.ok) continue;
+      const html = await res.text();
+
+      // Extract document links from Scribd search results HTML
+      const docPattern = /href="(\/document\/(\d+)\/([^"?]+))"/g;
+      let match;
+      const seen = new Set<string>();
+      while ((match = docPattern.exec(html)) !== null && results.length < 5) {
+        const path = match[1];
+        const docId = match[2];
+        const slug = match[3];
+        if (seen.has(docId)) continue;
+        seen.add(docId);
+
+        // Filter to music/score-related slugs
+        const slugLower = slug.toLowerCase();
+        const isRelevant = ["piano", "sheet", "score", "music", "partitura", "partition",
+          compositionName.toLowerCase().split(" ")[0],
+          composer.toLowerCase().split(" ").pop() ?? ""].some(kw => slugLower.includes(kw));
+
+        if (!isRelevant && results.length > 0) continue;
+
+        const title = slug.replace(/-/g, " ").replace(/\b\w/g, c => c.toUpperCase());
+        // Scribd documents require subscription access — open in browser, cannot direct-download server-side
+        results.push({
+          source: "scribd",
+          title: `${title} (Scribd)`,
+          url: `https://www.scribd.com${path}`,
+          previewUrl: `https://www.scribd.com${path}`,
+          canImportDirectly: false,
+          confidence: results.length === 0 ? "high" : "medium",
+          notes: "Open in Scribd to read/download with your subscription",
+        });
+      }
+    } catch (err) {
+      console.error("[SheetFinder] Scribd search error:", err);
+    }
+    if (results.length >= 3) break;
+  }
+
+  return results;
+}
+
+/** Scan YouTube video description and comments for PDF/sheet music links */
+async function scanYouTubeLinks(
+  videoId: string,
+  description: string
+): Promise<SheetMusicResult[]> {
+  const results: SheetMusicResult[] = [];
+
+  // PDF/sheet music URL patterns
+  const urlPattern = /https?:\/\/[^\s"<>)]+(?:\.pdf|imslp\.org\/wiki\/[^\s"<>)]+|musescore\.com\/[^\s"<>)]+|drive\.google\.com\/[^\s"<>)]+|dropbox\.com\/[^\s"<>)]+)/gi;
+
+  // Scan description
+    const descLinks = description.match(urlPattern) ?? [];
+  for (const link of descLinks.slice(0, 3)) {
+    const isPdf = link.toLowerCase().includes(".pdf");
+    const isImslp = link.includes("imslp.org");
+    const isMusescore = link.includes("musescore.com");
+    if (isPdf || isImslp || isMusescore) {
+      results.push({
+        source: "youtube_description",
+        title: isImslp ? "IMSLP Score (from video description)"
+          : isMusescore ? "MuseScore (from video description)"
+          : "PDF Score (from video description)",
+        url: link,
+        pdfUrl: isPdf ? link : undefined,
+        previewUrl: link,
+        canImportDirectly: isPdf,
+        confidence: "high",
+        notes: "Found directly in the YouTube video description",
+      });
+    }
+  }
+
+  // Fetch top comments for sheet music links
+  try {
+    const commentsResult = await callDataApi("Youtube/comments", {
+      query: { videoId, sortBy: "TOP_COMMENTS" },
+    }) as any;
+
+    const comments: any[] = commentsResult?.comments ?? commentsResult?.items ?? [];
+    for (const comment of comments.slice(0, 30)) {
+      const text: string = comment?.comment?.content ?? comment?.snippet?.topLevelComment?.snippet?.textDisplay ?? "";
+      const links = text.match(urlPattern) ?? [];
+      for (const link of links) {
+        const isPdf = link.toLowerCase().includes(".pdf");
+        const isImslp = link.includes("imslp.org");
+        const isMusescore = link.includes("musescore.com");
+        if (isPdf || isImslp || isMusescore) {
+          results.push({
+            source: "youtube_comments",
+            title: isImslp ? "IMSLP Score (from comment)"
+              : isMusescore ? "MuseScore (from comment)"
+              : "PDF Score (from comment)",
+            url: link,
+            pdfUrl: isPdf ? link : undefined,
+            previewUrl: link,
+            canImportDirectly: isPdf,
+            confidence: "medium",
+            notes: "Found in YouTube video comments",
+          });
+          if (results.length >= 5) break;
+        }
+      }
+      if (results.length >= 5) break;
+    }
+  } catch (err) {
+    console.error("[SheetFinder] YouTube comments fetch error:", err);
+  }
+
+  return results;
+}
+
+/** Search IMSLP for free public domain scores */
+async function searchImslp(
+  compositionName: string,
+  composer: string
+): Promise<SheetMusicResult[]> {
+  const results: SheetMusicResult[] = [];
+  try {
+    const query = encodeURIComponent(`${compositionName} ${composer} piano`);
+    const url = `https://imslp.org/api.php?action=query&list=search&srsearch=${query}&srnamespace=0&srlimit=5&format=json&origin=*`;
+    const res = await fetch(url, {
+      headers: { "User-Agent": "PianoMasteryPortal/1.0 (educational tool)" },
+      signal: AbortSignal.timeout(8_000),
+    });
+    if (!res.ok) return results;
+    const data = await res.json() as any;
+    const hits: any[] = data?.query?.search ?? [];
+
+    for (const hit of hits.slice(0, 3)) {
+      const title: string = hit.title ?? "";
+      if (title.startsWith("Category:") || title.startsWith("IMSLP:")) continue;
+      const pageUrl = `https://imslp.org/wiki/${encodeURIComponent(title.replace(/ /g, "_"))}`;
+      // IMSLP pages list multiple PDF files — we can't reliably resolve a direct PDF URL
+      // without rendering JS. Mark as browse-only; user opens the page to download.
+      results.push({
+        source: "imslp",
+        title: `${title} (IMSLP — Free)`,
+        url: pageUrl,
+        previewUrl: pageUrl,
+        canImportDirectly: false,
+        confidence: results.length === 0 ? "high" : "medium",
+        notes: "Free public domain score — open IMSLP page to download the PDF",
+      });
+    }
+  } catch (err) {
+    console.error("[SheetFinder] IMSLP search error:", err);
+  }
+  return results;
+}
+
+/** Search MuseScore for free scores */
+async function searchMusescore(
+  compositionName: string,
+  composer: string
+): Promise<SheetMusicResult[]> {
+  const results: SheetMusicResult[] = [];
+  try {
+    const query = encodeURIComponent(`${composer} ${compositionName} piano`);
+    const url = `https://musescore.com/sheetmusic?text=${query}&instrument=piano`;
+    results.push({
+      source: "musescore",
+      title: `Search MuseScore: "${compositionName}" by ${composer}`,
+      url,
+      previewUrl: url,
+      canImportDirectly: false,
+      confidence: "low",
+      notes: "Click to browse MuseScore for free scores (manual download)",
+    });
+  } catch {
+    // ignore
+  }
+  return results;
+}
+
+// ── Main entry point ──────────────────────────────────────────────────────────
+
+export async function findSheetMusicFromYouTube(
+  youtubeUrl: string,
+  scribdSessionCookie: string
+): Promise<FinderResult> {
+  const videoId = extractVideoId(youtubeUrl);
+  if (!videoId) {
+    return {
+      videoId: "",
+      videoTitle: "",
+      compositionName: "",
+      composer: "",
+      sources: [],
+      error: "Could not extract a valid YouTube video ID from the URL.",
+    };
+  }
+
+  console.log(`[SheetFinder] Starting search for video: ${videoId}`);
+
+  // Step 1: Get video metadata
+  const meta = await getVideoMetadata(videoId);
+  const videoTitle = meta?.title ?? `YouTube video ${videoId}`;
+  const description = meta?.description ?? "";
+  const channelTitle = meta?.channelTitle ?? "";
+
+  console.log(`[SheetFinder] Video: "${videoTitle}"`);
+
+  // Step 2: Identify composition
+  const { compositionName, composer } = await identifyComposition(videoTitle, description, channelTitle);
+  console.log(`[SheetFinder] Identified: "${compositionName}" by ${composer}`);
+
+  // Step 3–6: Run all searches in parallel
+  const [scribdResults, ytResults, imslpResults, musescoreResults] = await Promise.all([
+    searchScribd(compositionName, composer, scribdSessionCookie),
+    scanYouTubeLinks(videoId, description),
+    searchImslp(compositionName, composer),
+    searchMusescore(compositionName, composer),
+  ]);
+
+  // Merge and deduplicate by URL
+  const seen = new Set<string>();
+  const allSources: SheetMusicResult[] = [
+    ...scribdResults,
+    ...ytResults,
+    ...imslpResults,
+    ...musescoreResults,
+  ].filter(r => {
+    if (seen.has(r.url)) return false;
+    seen.add(r.url);
+    return true;
+  });
+
+  console.log(`[SheetFinder] Found ${allSources.length} sources total`);
+
+  return {
+    videoId,
+    videoTitle,
+    compositionName,
+    composer,
+    sources: allSources,
+  };
+}

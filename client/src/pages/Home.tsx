@@ -8,7 +8,7 @@ import { useState, useCallback, useRef, useEffect } from "react";
 import { useLocation } from "wouter";
 import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
-import { Music, Upload, BookOpen, ChevronRight, Loader2, AlertCircle, CheckCircle2, Clock, Trash2, Youtube, ExternalLink, LogOut, User, Search, FileText, X, Download, Import, Link } from "lucide-react";
+import { Music, Upload, BookOpen, ChevronRight, Loader2, AlertCircle, CheckCircle2, Clock, Trash2, Youtube, ExternalLink, LogOut, User, Search, FileText, X, Download, Import, Link, Sparkles, ArrowRight, Check, Globe } from "lucide-react";
 import { useAuth } from "@/_core/hooks/useAuth";
 
 // ── Asset URLs ────────────────────────────────────────────────────────────────
@@ -503,6 +503,246 @@ function StatusBadge({ status }: { status: string }) {
     <span className="inline-flex items-center gap-1 text-[0.65rem] font-mono text-slate-400 bg-slate-400/10 border border-slate-400/20 rounded-full px-2 py-0.5">
       <Clock size={10} /> Pending
     </span>
+  );
+}
+
+// ── YouTube → Sheet Music Finder ─────────────────────────────────────────────
+type FinderResult = {
+  videoId: string;
+  videoTitle: string;
+  compositionName: string;
+  composer: string;
+  sources: Array<{
+    source: string;
+    title: string;
+    url: string;
+    pdfUrl?: string;
+    previewUrl?: string;
+    canImportDirectly?: boolean;
+    confidence: string;
+    notes?: string;
+  }>;
+};
+
+function sourceLabel(source: string) {
+  if (source === "scribd") return { label: "Scribd", color: "oklch(0.72_0.14_145)", bg: "oklch(0.42_0.14_145/0.15)", border: "oklch(0.42_0.14_145/0.35)" };
+  if (source === "youtube_description") return { label: "YouTube Description", color: "oklch(0.68_0.20_25)", bg: "oklch(0.45_0.22_25/0.15)", border: "oklch(0.45_0.22_25/0.35)" };
+  if (source === "youtube_comments") return { label: "YouTube Comments", color: "oklch(0.68_0.20_25)", bg: "oklch(0.45_0.22_25/0.15)", border: "oklch(0.45_0.22_25/0.35)" };
+  if (source === "imslp") return { label: "IMSLP (Free)", color: "oklch(0.72_0.14_220)", bg: "oklch(0.42_0.14_220/0.15)", border: "oklch(0.42_0.14_220/0.35)" };
+  if (source === "musescore") return { label: "MuseScore", color: "oklch(0.72_0.12_260)", bg: "oklch(0.42_0.12_260/0.15)", border: "oklch(0.42_0.12_260/0.35)" };
+  return { label: "Web", color: "oklch(0.65_0.015_265)", bg: "oklch(0.22_0.010_265/0.15)", border: "oklch(0.30_0.010_265/0.35)" };
+}
+
+function YouTubeSheetMusicFinder() {
+  const utils = trpc.useUtils();
+  const [ytUrl, setYtUrl] = useState("");
+  const [result, setResult] = useState<FinderResult | null>(null);
+  const [importingUrl, setImportingUrl] = useState<string | null>(null);
+  const [importedUrls, setImportedUrls] = useState<Set<string>>(new Set());
+
+  const findMutation = trpc.findSheetMusic.useMutation({
+    onSuccess: (data) => {
+      setResult(data as FinderResult);
+      if ((data as FinderResult).sources.length === 0) {
+        toast.info("No sheet music found. Try a different video or search manually.");
+      }
+    },
+    onError: (err) => {
+      toast.error("Search failed: " + err.message);
+    },
+  });
+
+  const importMutation = trpc.importSheetMusicResult.useMutation({
+    onSuccess: (data) => {
+      utils.compositions.list.invalidate();
+      toast.success(`"${data.title}" imported! AI analysis will be ready in ~30 seconds.`);
+    },
+    onError: (err) => {
+      toast.error("Import failed: " + err.message);
+      setImportingUrl(null);
+    },
+  });
+
+  const handleFind = () => {
+    const url = ytUrl.trim();
+    if (!url) return;
+    setResult(null);
+    findMutation.mutate({ youtubeUrl: url });
+  };
+
+  const handleImport = async (src: FinderResult["sources"][0]) => {
+    const urlToFetch = src.pdfUrl ?? src.url;
+    setImportingUrl(urlToFetch);
+    try {
+      await importMutation.mutateAsync({
+        pdfUrl: urlToFetch,
+        titleHint: result ? `${result.compositionName} — ${result.composer}` : src.title,
+        isScribd: src.source === "scribd",
+      });
+      setImportedUrls(prev => new Set(Array.from(prev).concat(urlToFetch)));
+    } finally {
+      setImportingUrl(null);
+    }
+  };
+
+  const isSearching = findMutation.isPending;
+
+  return (
+    <div className="mb-16">
+      {/* Section header */}
+      <div className="flex items-center gap-3 mb-6">
+        <span className="text-[oklch(0.78_0.12_85)]">♪</span>
+        <div className="flex-1 h-px bg-gradient-to-r from-[oklch(0.78_0.12_85/0.4)] to-transparent" />
+        <p className="font-mono text-[0.6rem] text-[oklch(0.78_0.12_85)] uppercase tracking-[0.25em]">Find Sheet Music from YouTube</p>
+        <div className="flex-1 h-px bg-gradient-to-l from-[oklch(0.78_0.12_85/0.4)] to-transparent" />
+        <span className="text-[oklch(0.78_0.12_85)]">♪</span>
+      </div>
+
+      {/* Input row */}
+      <div className="flex items-center gap-2 mb-3">
+        <div
+          className="flex-1 flex items-center gap-2 rounded-xl border border-[oklch(0.28_0.016_265)] bg-[oklch(0.14_0.010_265)] px-3 py-2.5 focus-within:border-[oklch(0.55_0.08_85)] transition-colors"
+          onDrop={(e) => {
+            e.preventDefault();
+            const text = e.dataTransfer.getData("text/plain") || e.dataTransfer.getData("text/uri-list");
+            if (text) setYtUrl(text.trim());
+          }}
+          onDragOver={(e) => e.preventDefault()}
+        >
+          <Youtube size={14} className="shrink-0 text-[oklch(0.68_0.20_25)]" />
+          <input
+            type="url"
+            value={ytUrl}
+            onChange={(e) => setYtUrl(e.target.value)}
+            onKeyDown={(e) => e.key === "Enter" && handleFind()}
+            placeholder="Paste or drag a YouTube URL (e.g. https://youtu.be/...)"
+            className="flex-1 bg-transparent text-sm text-[oklch(0.88_0.01_85)] placeholder:text-[oklch(0.38_0.012_265)] outline-none min-w-0"
+          />
+          {ytUrl && (
+            <button onClick={() => { setYtUrl(""); setResult(null); }} className="shrink-0 text-[oklch(0.40_0.012_265)] hover:text-[oklch(0.65_0.015_265)] transition-colors">
+              <X size={13} />
+            </button>
+          )}
+        </div>
+        <button
+          onClick={handleFind}
+          disabled={!ytUrl.trim() || isSearching}
+          className="shrink-0 flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-[oklch(0.78_0.12_85)] text-[oklch(0.12_0.018_265)] text-sm font-semibold disabled:opacity-40 disabled:cursor-not-allowed hover:bg-[oklch(0.85_0.12_85)] active:scale-[0.97] transition-all duration-150"
+        >
+          {isSearching ? <Loader2 size={14} className="animate-spin" /> : <Sparkles size={14} />}
+          {isSearching ? "Searching…" : "Find Sheet Music"}
+        </button>
+      </div>
+      <p className="text-xs text-[oklch(0.38_0.012_265)] text-center mb-4">
+        Paste any YouTube video URL — the portal will identify the piece and search Scribd, YouTube, IMSLP &amp; MuseScore
+      </p>
+
+      {/* Progress steps while searching */}
+      {isSearching && (
+        <div className="nocturne-card p-5 mb-4">
+          <p className="text-xs font-mono text-[oklch(0.78_0.12_85)] uppercase tracking-widest mb-4">Searching…</p>
+          <div className="space-y-2.5">
+            {[
+              { label: "Identifying the composition", icon: Music },
+              { label: "Searching your Scribd subscription", icon: Search },
+              { label: "Scanning YouTube description & comments", icon: Youtube },
+              { label: "Checking IMSLP & MuseScore", icon: Globe },
+            ].map(({ label, icon: Icon }, i) => (
+              <div key={i} className="flex items-center gap-3">
+                <div className="w-5 h-5 rounded-full border border-[oklch(0.78_0.12_85/0.4)] flex items-center justify-center">
+                  <Loader2 size={10} className="text-[oklch(0.78_0.12_85)] animate-spin" />
+                </div>
+                <span className="text-sm text-[oklch(0.65_0.015_265)]">{label}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Results */}
+      {result && !isSearching && (
+        <div className="space-y-3">
+          {/* Identified piece banner */}
+          <div className="nocturne-card p-4 flex items-start gap-3">
+            <div className="w-8 h-8 rounded-lg bg-[oklch(0.78_0.12_85/0.15)] border border-[oklch(0.78_0.12_85/0.3)] flex items-center justify-center shrink-0">
+              <Music size={14} className="text-[oklch(0.78_0.12_85)]" />
+            </div>
+            <div className="min-w-0">
+              <p className="text-xs font-mono text-[oklch(0.78_0.12_85)] uppercase tracking-widest mb-0.5">Identified Composition</p>
+              <p className="font-['Playfair_Display'] font-semibold text-[oklch(0.92_0.01_85)] truncate">{result.compositionName}</p>
+              <p className="text-sm text-[oklch(0.65_0.015_265)]">{result.composer}</p>
+            </div>
+            <a
+              href={`https://www.youtube.com/watch?v=${result.videoId}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="ml-auto shrink-0 flex items-center gap-1 text-xs text-[oklch(0.68_0.20_25)] hover:text-[oklch(0.78_0.20_25)] transition-colors"
+            >
+              <Youtube size={12} /> View
+            </a>
+          </div>
+
+          {result.sources.length === 0 ? (
+            <div className="nocturne-card p-6 text-center">
+              <p className="text-[oklch(0.65_0.015_265)] text-sm">No sheet music found automatically.</p>
+              <p className="text-[oklch(0.45_0.012_265)] text-xs mt-1">Try searching manually below using the composition name.</p>
+            </div>
+          ) : (
+            result.sources.map((src, i) => {
+              const badge = sourceLabel(src.source);
+              const urlKey = src.pdfUrl ?? src.url;
+              const isImported = importedUrls.has(urlKey);
+              const isImporting = importingUrl === urlKey;
+              const canImport = src.canImportDirectly === true;
+
+              return (
+                <div key={i} className="nocturne-card p-4 flex items-start gap-3">
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 mb-1.5 flex-wrap">
+                      <span
+                        className="text-[0.6rem] font-mono uppercase tracking-wider px-2 py-0.5 rounded-full border"
+                        style={{ color: badge.color, background: badge.bg, borderColor: badge.border }}
+                      >
+                        {badge.label}
+                      </span>
+                      {src.confidence === "high" && (
+                        <span className="text-[0.6rem] font-mono text-emerald-400 bg-emerald-400/10 border border-emerald-400/20 rounded-full px-2 py-0.5 uppercase tracking-wider">Best Match</span>
+                      )}
+                    </div>
+                    <p className="text-sm text-[oklch(0.88_0.01_85)] font-medium truncate mb-0.5">{src.title}</p>
+                    {src.notes && <p className="text-xs text-[oklch(0.50_0.012_265)]">{src.notes}</p>}
+                  </div>
+                  <div className="flex items-center gap-2 shrink-0">
+                    <a
+                      href={src.previewUrl ?? src.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex items-center gap-1 text-xs text-[oklch(0.55_0.015_265)] hover:text-[oklch(0.78_0.12_85)] transition-colors px-2 py-1.5 rounded-lg border border-[oklch(0.25_0.012_265)] hover:border-[oklch(0.78_0.12_85/0.4)]"
+                    >
+                      <ExternalLink size={11} /> Open
+                    </a>
+                    {isImported ? (
+                      <span className="flex items-center gap-1 text-xs text-emerald-400 px-2 py-1.5">
+                        <Check size={11} /> Imported
+                      </span>
+                    ) : canImport ? (
+                      <button
+                        onClick={() => handleImport(src)}
+                        disabled={isImporting}
+                        className="flex items-center gap-1 text-xs bg-[oklch(0.78_0.12_85)] text-[oklch(0.12_0.018_265)] font-semibold px-3 py-1.5 rounded-lg hover:bg-[oklch(0.85_0.12_85)] active:scale-[0.97] disabled:opacity-50 transition-all duration-150"
+                      >
+                        {isImporting ? <Loader2 size={11} className="animate-spin" /> : <Download size={11} />}
+                        {isImporting ? "Importing…" : "Import"}
+                      </button>
+                    ) : null}
+                  </div>
+                </div>
+              );
+            })
+          )}
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -1050,6 +1290,9 @@ export default function Home() {
             </>
           )}
         </div>
+
+        {/* YouTube → Sheet Music Finder */}
+        <YouTubeSheetMusicFinder />
 
         {/* Sheet music search */}
         <SheetMusicSearch />

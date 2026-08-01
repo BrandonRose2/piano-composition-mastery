@@ -16,6 +16,8 @@ import {
 import { storagePut } from "./storage";
 import { analyzeComposition } from "./analyzeComposition";
 import { callDataApi } from "./_core/dataApi";
+import { findSheetMusicFromYouTube } from "./sheetMusicFinder";
+import { ENV } from "./_core/env";
 import { sdk } from "./_core/sdk";
 import * as bcrypt from "bcryptjs";
 import { users } from "../drizzle/schema";
@@ -434,6 +436,94 @@ export const appRouter = router({
         return { success: true, username: user.username ?? input.username };
       }),
   }),
+
+  /**
+   * YouTube → Sheet Music finder.
+   * Given a YouTube URL, identifies the composition and searches Scribd, YouTube
+   * description/comments, IMSLP, and MuseScore for free PDF sheet music.
+   */
+  findSheetMusic: protectedProcedure
+    .input(z.object({ youtubeUrl: z.string().min(1) }))
+    .mutation(async ({ input }) => {
+      const cookie = ENV.scribdSessionCookie;
+      if (!cookie) {
+        throw new Error("Scribd session cookie not configured. Please contact the portal admin.");
+      }
+      const result = await findSheetMusicFromYouTube(input.youtubeUrl, cookie);
+      if (result.error) throw new Error(result.error);
+      return result;
+    }),
+
+  /**
+   * Import a sheet music result (from findSheetMusic) into the user's library.
+   * Fetches the PDF from the given URL and kicks off AI analysis.
+   */
+  importSheetMusicResult: protectedProcedure
+    .input(z.object({
+      pdfUrl: z.string().url(),
+      titleHint: z.string().optional().default(""),
+      isScribd: z.boolean().optional().default(false),
+    }))
+    .mutation(async ({ input, ctx }) => {
+      const userId = ctx.user.id;
+      const headers: Record<string, string> = {
+        "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+        "Accept": "application/pdf,*/*",
+      };
+      if (input.isScribd && ENV.scribdSessionCookie) {
+        headers["Cookie"] = `_scribd_session=${ENV.scribdSessionCookie}`;
+        headers["Referer"] = "https://www.scribd.com/";
+      }
+
+      const response = await fetch(input.pdfUrl, { headers, redirect: "follow", signal: AbortSignal.timeout(20_000) });
+      if (!response.ok) throw new Error(`Could not download PDF: HTTP ${response.status}`);
+
+      // Validate that the response is actually a PDF, not an HTML page
+      const contentType = response.headers.get("content-type") ?? "";
+      if (contentType.includes("text/html")) {
+        throw new Error(
+          "This link opens a webpage, not a direct PDF file. Please open it in your browser and download the PDF manually, then drag it into the upload zone."
+        );
+      }
+
+      const arrayBuffer = await response.arrayBuffer();
+      const buffer = Buffer.from(arrayBuffer);
+      if (buffer.length < 100) throw new Error("Downloaded file is too small to be a valid PDF.");
+
+      // Check PDF magic bytes (%PDF-)
+      const header = buffer.slice(0, 5).toString("ascii");
+      if (!header.startsWith("%PDF")) {
+        throw new Error(
+          "The downloaded file does not appear to be a PDF. Please open the link in your browser and download the PDF manually."
+        );
+      }
+
+      const urlPath = new URL(input.pdfUrl).pathname;
+      const rawName = decodeURIComponent(urlPath.split("/").pop() ?? "score.pdf");
+      const fileName = rawName.endsWith(".pdf") ? rawName : `${rawName}.pdf`;
+      const title = input.titleHint || fileName.replace(/\.pdf$/i, "").replace(/[-_]/g, " ");
+
+      const key = `compositions/${userId}/${Date.now()}-${fileName.replace(/[^a-zA-Z0-9._-]/g, "_")}`;
+      const { url: fileUrl } = await storagePut(key, buffer, "application/pdf");
+
+      const composition = await createComposition({ userId, title, fileName, fileKey: key, fileUrl, mimeType: "application/pdf", status: "pending" });
+      if (!composition) throw new Error("Failed to create composition record");
+
+      const compositionId = composition.id;
+      const fileBuffer = buffer;
+      setTimeout(async () => {
+        try {
+          await updateCompositionStatus(compositionId, "analyzing");
+          const { analysis, framework } = await analyzeComposition(fileName, fileBuffer, "application/pdf");
+          await updateCompositionStatus(compositionId, "complete", { analysis, framework });
+        } catch (err) {
+          const errMsg = err instanceof Error ? err.message : String(err);
+          await updateCompositionStatus(compositionId, "error", { errorMessage: errMsg }).catch(() => {});
+        }
+      }, 0);
+
+      return { id: composition.id, title };
+    }),
 
   /**
    * Fetch a webpage URL server-side, extract its text content, and kick off AI analysis.
