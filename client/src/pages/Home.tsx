@@ -941,6 +941,21 @@ function CompositionCard({ composition, progressSummary }: { composition: any; p
     },
   });
 
+  const retryMutation = trpc.compositions.retryAnalysis.useMutation({
+    onSuccess: () => {
+      utils.compositions.list.invalidate();
+      toast.success("Re-running AI analysis… this takes about 30 seconds.");
+    },
+    onError: (err) => {
+      toast.error("Retry failed: " + err.message);
+    },
+  });
+
+  const handleRetry = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    retryMutation.mutate({ id: composition.id });
+  };
+
   const currentStatus = statusData?.status ?? composition.status;
   const errorMsg = statusData?.errorMessage ?? null;
 
@@ -1003,9 +1018,19 @@ function CompositionCard({ composition, progressSummary }: { composition: any; p
             ) : currentStatus === "analyzing" ? (
               <p className="text-xs text-amber-400/70 italic">AI is generating your analysis and 30-day framework…</p>
             ) : currentStatus === "error" ? (
-              <p className="text-xs text-red-400/70 italic">
-                {errorMsg ? `Error: ${errorMsg.slice(0, 120)}` : "Analysis failed. Please try uploading again."}
-              </p>
+              <div className="flex items-center gap-2 flex-wrap">
+                <p className="text-xs text-red-400/70 italic flex-1 min-w-0">
+                  {errorMsg ? `Error: ${errorMsg.slice(0, 100)}` : "Analysis failed."}
+                </p>
+                <button
+                  onClick={handleRetry}
+                  disabled={retryMutation.isPending}
+                  className="shrink-0 flex items-center gap-1 text-[0.65rem] font-mono uppercase tracking-wider px-2 py-1 rounded-md bg-[oklch(0.78_0.12_85/0.15)] border border-[oklch(0.78_0.12_85/0.4)] text-[oklch(0.78_0.12_85)] hover:bg-[oklch(0.78_0.12_85/0.25)] active:scale-[0.97] disabled:opacity-50 transition-all duration-150"
+                >
+                  {retryMutation.isPending ? <Loader2 size={10} className="animate-spin" /> : <ArrowRight size={10} />}
+                  {retryMutation.isPending ? "Retrying…" : "Retry"}
+                </button>
+              </div>
             ) : (
               <p className="text-xs text-[oklch(0.40_0.012_265)] italic">Queued for analysis…</p>
             )}

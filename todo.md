@@ -54,3 +54,7 @@
 - [x] Backend: PDF validation added to importSheetMusicResult (content-type + magic bytes check)
 - [x] Frontend: Scribd result cards show "Open in Scribd" button + micro-tip "Download the PDF, then drag it into the upload zone above"
 - [x] Frontend: IMSLP shows "Open IMSLP", MuseScore shows "Browse MuseScore" with same drag-back guidance
+
+## Retry Analysis
+- [x] Backend: retryAnalysis tRPC mutation — re-fetch file from S3, re-run analyzeComposition, update status
+- [x] Frontend: show "Retry" button on error cards in the library (inline next to error message)

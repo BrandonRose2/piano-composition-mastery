@@ -134,6 +134,50 @@ export const appRouter = router({
         await deleteComposition(input.id, ctx.user.id);
         return { success: true };
       }),
+
+    /**
+     * Retry AI analysis for a composition that previously errored.
+     * Re-fetches the file from S3 using a presigned URL and re-runs analyzeComposition.
+     */
+    retryAnalysis: protectedProcedure
+      .input(z.object({ id: z.number() }))
+      .mutation(async ({ input, ctx }) => {
+        const comp = await getCompositionById(input.id, ctx.user.id);
+        if (!comp) throw new Error("Composition not found or access denied");
+        if (!comp.fileKey) throw new Error("No file stored for this composition — please re-upload.");
+        if (comp.status === "analyzing") throw new Error("Analysis is already in progress.");
+
+        // Mark as analyzing immediately so the UI updates
+        await updateCompositionStatus(comp.id, "analyzing");
+
+        const compositionId = comp.id;
+        const fileName = comp.fileName ?? comp.title;
+        const mimeType = comp.mimeType ?? "application/pdf";
+        const fileKey = comp.fileKey;
+
+        // Re-fetch file from S3 and re-run analysis in the background
+        setTimeout(async () => {
+          try {
+            const { storageGetSignedUrl } = await import("./storage");
+            const signedUrl = await storageGetSignedUrl(fileKey);
+            const fileResp = await fetch(signedUrl, { signal: AbortSignal.timeout(30_000) });
+            if (!fileResp.ok) throw new Error(`Could not fetch file from storage: HTTP ${fileResp.status}`);
+            const arrayBuffer = await fileResp.arrayBuffer();
+            const fileBuffer = Buffer.from(arrayBuffer);
+
+            const { analysis, framework } = await analyzeComposition(fileName, fileBuffer, mimeType);
+            await updateCompositionStatus(compositionId, "complete", { analysis, framework });
+            console.log(`[RetryAnalysis] Completed for composition ${compositionId}`);
+          } catch (err) {
+            const errMsg = err instanceof Error ? err.message : String(err);
+            console.error(`[RetryAnalysis] Failed for composition ${compositionId}:`, errMsg);
+            await updateCompositionStatus(compositionId, "error", { errorMessage: errMsg })
+              .catch(dbErr => console.error("[RetryAnalysis] Failed to update error status:", dbErr));
+          }
+        }, 0);
+
+        return { success: true, id: compositionId };
+      }),
   }),
 
   youtube: router({
