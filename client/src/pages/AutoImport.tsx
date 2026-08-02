@@ -1,7 +1,8 @@
+import { useState } from "react";
 import { trpc } from "@/lib/trpc";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { getLoginUrl } from "@/const";
-import { CheckCircle, XCircle, SkipForward, Clock, FolderOpen, RefreshCw, Calendar } from "lucide-react";
+import { CheckCircle, XCircle, SkipForward, Clock, FolderOpen, RefreshCw, Calendar, Play } from "lucide-react";
 
 type ImportStatus = "imported" | "skipped" | "error";
 
@@ -31,6 +32,13 @@ export default function AutoImport() {
   const { user, loading: authLoading } = useAuth();
   const { data: history, isLoading, refetch } = trpc.autoImport.list.useQuery(undefined, {
     enabled: !!user,
+  });
+  const [runResult, setRunResult] = useState<null | { imported: number; skipped: number; errors: number; scanned: number; newPianoFiles: number; results: { filename: string; status: string }[] }>(null);
+  const runNow = trpc.autoImport.runNow.useMutation({
+    onSuccess: (data) => {
+      setRunResult(data);
+      refetch();
+    },
   });
 
   if (authLoading) {
@@ -77,6 +85,65 @@ export default function AutoImport() {
       </div>
 
       <div className="max-w-4xl mx-auto px-6 py-8 space-y-8">
+
+        {/* Run Now button */}
+        <div className="bg-[#111] border border-[#c9a84c]/30 rounded-xl p-6">
+          <div className="flex items-center justify-between gap-4">
+            <div>
+              <h2 className="text-[#e8d5a3] font-semibold">Run Import Now</h2>
+              <p className="text-[#8a7a5a] text-sm mt-1">
+                Immediately scan your Downloads folder and import any new piano sheet music PDFs into your library.
+              </p>
+            </div>
+            <button
+              onClick={() => { setRunResult(null); runNow.mutate(); }}
+              disabled={runNow.isPending}
+              className="flex items-center gap-2 px-5 py-2.5 bg-[#c9a84c] text-black font-semibold rounded-lg hover:bg-[#b8973b] disabled:opacity-50 disabled:cursor-not-allowed transition-all active:scale-95 flex-shrink-0"
+            >
+              {runNow.isPending ? (
+                <><div className="w-4 h-4 border-2 border-black border-t-transparent rounded-full animate-spin" /> Scanning...</>
+              ) : (
+                <><Play className="w-4 h-4" /> Run Now</>
+              )}
+            </button>
+          </div>
+
+          {/* Run result */}
+          {runNow.isError && (
+            <div className="mt-4 p-3 bg-red-900/20 border border-red-800/40 rounded-lg text-red-400 text-sm">
+              {runNow.error.message}
+            </div>
+          )}
+          {runResult && (
+            <div className="mt-4 space-y-3">
+              <div className="flex flex-wrap gap-3 text-sm">
+                <span className="px-3 py-1 bg-[#1a1a1a] rounded-full text-[#8a7a5a]">Scanned {runResult.scanned} PDFs</span>
+                <span className="px-3 py-1 bg-[#1a1a1a] rounded-full text-[#8a7a5a]">{runResult.newPianoFiles} new piano files found</span>
+                <span className="px-3 py-1 bg-green-900/30 rounded-full text-green-400">{runResult.imported} imported</span>
+                {runResult.skipped > 0 && <span className="px-3 py-1 bg-yellow-900/30 rounded-full text-yellow-400">{runResult.skipped} skipped</span>}
+                {runResult.errors > 0 && <span className="px-3 py-1 bg-red-900/30 rounded-full text-red-400">{runResult.errors} errors</span>}
+              </div>
+              {runResult.results.length > 0 && (
+                <div className="bg-[#0d0d0d] rounded-lg divide-y divide-[#1a1a1a] max-h-48 overflow-y-auto">
+                  {runResult.results.map((r, i) => (
+                    <div key={i} className="px-4 py-2 flex items-center justify-between gap-3 text-xs">
+                      <span className="text-[#8a7a5a] truncate">{r.filename}</span>
+                      <span className={r.status === "imported" ? "text-green-400 flex-shrink-0" : r.status.startsWith("skipped") ? "text-yellow-400 flex-shrink-0" : "text-red-400 flex-shrink-0"}>
+                        {r.status}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              )}
+              {runResult.imported > 0 && (
+                <p className="text-[#c9a84c] text-sm">✓ {runResult.imported} new piece{runResult.imported !== 1 ? "s" : ""} added to your library — AI analysis is running in the background.</p>
+              )}
+              {runResult.imported === 0 && runResult.newPianoFiles === 0 && (
+                <p className="text-[#8a7a5a] text-sm">No new piano PDFs found — your library is up to date!</p>
+              )}
+            </div>
+          )}
+        </div>
 
         {/* Schedule info card */}
         <div className="bg-[#111] border border-[#2a2a2a] rounded-xl p-6">

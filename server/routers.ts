@@ -20,6 +20,9 @@ import { callDataApi } from "./_core/dataApi";
 import { findSheetMusicFromYouTube } from "./sheetMusicFinder";
 import { ENV } from "./_core/env";
 import { sdk } from "./_core/sdk";
+import { getImportedFilenames, recordImportedFile } from "./db";
+import * as fs from "fs";
+import * as path from "path";
 import * as bcrypt from "bcryptjs";
 import { users } from "../drizzle/schema";
 import { eq } from "drizzle-orm";
@@ -701,6 +704,90 @@ export const appRouter = router({
     /** List recent auto-import history */
     list: protectedProcedure.query(async () => {
       return listImportedFiles(100);
+    }),
+    /** Immediately scan the desktop Downloads folder and import new PDFs */
+    runNow: protectedProcedure.mutation(async ({ ctx }) => {
+      const userId = ctx.user.id;
+      // Scan the mounted desktop Downloads folder and Piano folder
+      const scanPaths = [
+        "/mnt/desktop/Users/brandonrose/Downloads",
+        "/mnt/desktop/Piano - New Music to Learn",
+      ];
+      let files: string[] = [];
+      let accessErrors: string[] = [];
+      for (const scanPath of scanPaths) {
+        try {
+          const entries = fs.readdirSync(scanPath);
+          const pdfs = entries
+            .filter(f => f.toLowerCase().endsWith(".pdf"))
+            .map(f => path.join(scanPath, f));
+          files = files.concat(pdfs);
+        } catch {
+          accessErrors.push(scanPath);
+        }
+      }
+      if (files.length === 0 && accessErrors.length === scanPaths.length) {
+        throw new Error("Could not access any desktop folders. Make sure your Mac is connected.");
+      }
+
+      // Get already-imported filenames to skip duplicates
+      const alreadyImportedArr = await getImportedFilenames();
+      const alreadyImported = new Set(alreadyImportedArr);
+
+      // Filter to only piano/music-related PDFs not yet imported
+      const pianoKeywords = /piano|sheet|music|liszt|chopin|einaudi|campanella|hanon|idea|icarus|soulmate|starry|veronika|wyden|reve|paterlini|winterwind|winter.wind|beanie|tony.ann|watson|primavera|experience|gibran|etude|opus|beethoven|mozart|bach|schubert|brahms|debussy|ravel|satie|rachmaninoff|nocturne|sonata|concerto|waltz|prelude|ballade|mazurka|polonaise|impromptu/i;
+      const newFiles = files.filter(f => {
+        const name = path.basename(f);
+        return pianoKeywords.test(name) && !alreadyImported.has(name);
+      });
+
+      const MAX_SIZE = 20 * 1024 * 1024; // 20MB
+      const results: { filename: string; status: string }[] = [];
+
+      for (const filePath of newFiles) {
+        const filename = path.basename(filePath);
+        try {
+          const stat = fs.statSync(filePath);
+          if (stat.size > MAX_SIZE) {
+            results.push({ filename, status: "skipped_too_large" });
+            continue;
+          }
+          const buffer = fs.readFileSync(filePath);
+          const fileKey = `auto-import/${Date.now()}-${filename}`;
+          const { url: fileUrl } = await storagePut(fileKey, buffer, "application/pdf");
+          const titleFromFilename = filename
+            .replace(/^\d+-/, "")
+            .replace(/\.[^.]+$/, "")
+            .replace(/[-_]/g, " ")
+            .replace(/\s+\(\d+\)$/, "")
+            .trim();
+          const comp = await createComposition({
+            userId,
+            title: titleFromFilename,
+            fileKey,
+            fileUrl,
+            fileName: filename,
+            mimeType: "application/pdf",
+          });
+          await recordImportedFile({ filename, filePath, compositionId: comp.id, status: "imported" });
+          // Kick off analysis in background (don't await)
+          analyzeComposition(filename, buffer, "application/pdf")
+            .then(result => updateCompositionStatus(comp.id, "complete", { analysis: result?.analysis, framework: result?.framework }))
+            .catch(err => updateCompositionStatus(comp.id, "error", { errorMessage: err.message }));
+          results.push({ filename, status: "imported" });
+        } catch (err) {
+          results.push({ filename, status: `error: ${err instanceof Error ? err.message : String(err)}` });
+        }
+      }
+
+      return {
+        scanned: files.length,
+        newPianoFiles: newFiles.length,
+        results,
+        imported: results.filter(r => r.status === "imported").length,
+        skipped: results.filter(r => r.status.startsWith("skipped")).length,
+        errors: results.filter(r => r.status.startsWith("error")).length,
+      };
     }),
   }),
 });

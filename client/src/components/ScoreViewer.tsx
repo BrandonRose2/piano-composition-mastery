@@ -336,15 +336,45 @@ function ImageViewer({ fileUrl, title }: { fileUrl: string; title?: string }) {
   );
 }
 
+// ── Unsupported File Fallback ─────────────────────────────────────────────────
+function UnsupportedViewer({ fileUrl, title }: { fileUrl: string; title?: string }) {
+  return (
+    <div className="flex flex-col items-center justify-center gap-4 p-10 text-center">
+      <div className="text-4xl">📄</div>
+      <div>
+        <p className="text-[oklch(0.85_0.015_265)] font-medium mb-1">
+          {title ?? "This file"} cannot be previewed
+        </p>
+        <p className="text-sm text-[oklch(0.55_0.015_265)]">
+          This file type is not supported for in-browser viewing.
+        </p>
+      </div>
+      <a
+        href={fileUrl}
+        download
+        target="_blank"
+        rel="noopener noreferrer"
+        className="inline-flex items-center gap-2 px-4 py-2 rounded-md bg-[oklch(0.3_0.02_265)] hover:bg-[oklch(0.35_0.025_265)] text-[oklch(0.9_0.01_265)] text-sm transition-colors"
+      >
+        ⬇ Download File
+      </a>
+    </div>
+  );
+}
+
 // ── Main Export ───────────────────────────────────────────────────────────────
 export default function ScoreViewer({ fileUrl, mimeType, title }: ScoreViewerProps) {
   const isPdf = mimeType === "application/pdf" || fileUrl.toLowerCase().endsWith(".pdf");
+  const isImage = mimeType?.startsWith("image/") ||
+    /\.(png|jpe?g|webp|gif|bmp|svg)$/i.test(fileUrl);
 
   return (
     <div className="rounded-lg overflow-hidden border border-[oklch(0.22_0.016_265)] bg-[oklch(0.12_0.018_265)]">
       {isPdf
         ? <PdfViewer fileUrl={fileUrl} title={title} />
-        : <ImageViewer fileUrl={fileUrl} title={title} />}
+        : isImage
+          ? <ImageViewer fileUrl={fileUrl} title={title} />
+          : <UnsupportedViewer fileUrl={fileUrl} title={title} />}
     </div>
   );
 }

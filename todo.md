@@ -68,3 +68,9 @@
 - [x] Create AGENT cron via manus-config schedule (every Sunday 9 AM UTC, taskUid: gkPG1zk4auEHTrVhxz68oR)
 - [x] Frontend: Auto-Import page at /auto-import showing schedule info, stats, and import history
 - [x] Frontend: Route registered in App.tsx with AuthGuard
+
+## Run Now Button on Auto-Import Page
+- [x] Backend: autoImport.runNow tRPC mutation — scan /mnt/desktop for PDFs, skip already-imported, upload + analyze new ones
+- [x] Frontend: Run Now button on /auto-import page with progress feedback
+- [x] ScoreViewer: graceful fallback for non-PDF/non-image mimeTypes (shows friendly message + download link)
+- [x] DB cleanup: removed junk HTML/Spotify/YouTube compositions (3 rows deleted, 15 real piano scores remain)
