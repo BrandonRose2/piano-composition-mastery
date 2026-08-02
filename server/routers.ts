@@ -822,24 +822,73 @@ export const appRouter = router({
       }),
   }),
 
-  /** Scribd saved library cache — sync from browser, search locally */
+  /** Scribd saved library cache — sync from pasted HTML or single URL, search locally */
   scribd: router({
-    /** Upsert a batch of docs scraped from the browser into the local cache */
-    syncSaved: protectedProcedure
-      .input(z.array(z.object({
-        docId: z.string(),
-        title: z.string(),
-        url: z.string(),
-        slug: z.string().optional(),
-        thumbnailUrl: z.string().optional(),
-      })))
+
+    /**
+     * Bulk sync: user pastes the raw HTML of their Scribd saved list page.
+     * Server parses it, extracts all document links, and upserts them into the cache.
+     */
+    syncFromHtml: protectedProcedure
+      .input(z.object({ html: z.string().min(10) }))
       .mutation(async ({ input, ctx }) => {
-        const docsWithUser = input.map(d => ({ ...d, userId: ctx.user.id }));
-        await upsertScribdSavedDocs(docsWithUser);
-        return { synced: input.length };
+        const { html } = input;
+        const docs: { userId: number; docId: string; title: string; url: string; slug: string }[] = [];
+        const seen = new Set<string>();
+
+        // Pattern: href="/document/123/slug-title" or href="/doc/123/slug"
+        const docPattern = /href="\/(document|doc)\/(\d+)\/([^"?#\s]+)"/g;
+        let m;
+        while ((m = docPattern.exec(html)) !== null) {
+          const docId = m[2];
+          const slug = m[3];
+          if (seen.has(docId)) continue;
+          seen.add(docId);
+          // Convert slug to title: "my-sheet-music" → "My Sheet Music"
+          const title = slug.replace(/-/g, " ").replace(/\b\w/g, c => c.toUpperCase());
+          docs.push({
+            userId: ctx.user.id,
+            docId,
+            title,
+            url: `https://www.scribd.com/document/${docId}/${slug}`,
+            slug,
+          });
+        }
+
+        if (docs.length === 0) {
+          throw new Error("No Scribd document links found in the pasted HTML. Make sure you copied the full page source from your Scribd saved list.");
+        }
+
+        await upsertScribdSavedDocs(docs);
+        return { synced: docs.length };
       }),
 
-    /** Return all cached saved docs for the current user */
+    /**
+     * Single URL add: user pastes one Scribd document URL.
+     * Server extracts docId/slug/title and upserts it.
+     */
+    addByUrl: protectedProcedure
+      .input(z.object({ url: z.string().url() }))
+      .mutation(async ({ input, ctx }) => {
+        // Match https://www.scribd.com/document/123/slug or /doc/123/slug
+        const match = input.url.match(/scribd\.com\/(document|doc)\/(\d+)\/([^?#\s]+)/);
+        if (!match) {
+          throw new Error("Invalid Scribd URL. Expected format: https://www.scribd.com/document/123/document-title");
+        }
+        const docId = match[2];
+        const slug = match[3];
+        const title = slug.replace(/-/g, " ").replace(/\b\w/g, c => c.toUpperCase());
+        await upsertScribdSavedDocs([{
+          userId: ctx.user.id,
+          docId,
+          title,
+          url: `https://www.scribd.com/document/${docId}/${slug}`,
+          slug,
+        }]);
+        return { title, docId };
+      }),
+
+    /** Return all cached saved docs for the current user, newest first */
     getSavedDocs: protectedProcedure
       .query(async ({ ctx }) => {
         return listScribdSavedDocs(ctx.user.id);

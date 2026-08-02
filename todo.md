@@ -108,3 +108,13 @@
 - [x] Backend: update sheet music finder to check scribd_saved_docs cache first before public search
 - [x] Frontend: Sync Scribd Library button on Auto-Import page (browser scrapes saved list, sends to server)
 - [x] Frontend: show "Your Scribd Library ★" gold badge on matched results in sheet music finder
+
+## Scribd Sync Fix (superseded by Scribd Sync v2)
+- [x] Replace broken browser cross-origin fetch — done via two-method approach (HTML paste + single URL)
+- [x] Update AutoImport.tsx Sync Now button — replaced with two-panel UI
+
+## Scribd Sync v2 (Both Methods)
+- [x] Backend: scribd.syncFromHtml mutation — parse pasted Scribd page HTML server-side, extract doc links, upsert to DB
+- [x] Backend: scribd.addByUrl mutation — accept a single Scribd URL, extract docId/title/slug, upsert to DB
+- [x] Frontend: replace broken Sync Now button with two-panel UI: (1) paste HTML bulk sync with step-by-step instructions, (2) single URL input with Add button
+- [x] Frontend: show live count of synced docs in header
