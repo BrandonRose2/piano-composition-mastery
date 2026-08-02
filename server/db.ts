@@ -1,6 +1,6 @@
 import { eq, desc, and } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/mysql2";
-import { InsertUser, users, compositions, practiceProgress, type InsertComposition } from "../drizzle/schema";
+import { InsertUser, users, compositions, practiceProgress, importedFiles, type InsertComposition, type InsertImportedFile } from "../drizzle/schema";
 import { ENV } from './_core/env';
 
 let _db: ReturnType<typeof drizzle> | null = null;
@@ -143,6 +143,35 @@ export async function deleteComposition(id: number, userId: number) {
   if (!comp) throw new Error("Composition not found or access denied");
   await db.delete(practiceProgress).where(eq(practiceProgress.compositionId, id));
   await db.delete(compositions).where(eq(compositions.id, id));
+}
+
+// ── Imported Files helpers ────────────────────────────────────────────────────
+
+export async function getImportedFilenames(): Promise<string[]> {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  const rows = await db.select({ filename: importedFiles.filename }).from(importedFiles);
+  return rows.map(r => r.filename);
+}
+
+export async function recordImportedFile(data: InsertImportedFile) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  const result = await db.insert(importedFiles).values(data);
+  // @ts-ignore
+  const insertId = result[0]?.insertId as number;
+  const rows = await db.select().from(importedFiles).where(eq(importedFiles.id, insertId)).limit(1);
+  return rows[0];
+}
+
+export async function listImportedFiles(limit = 50) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  return db
+    .select()
+    .from(importedFiles)
+    .orderBy(desc(importedFiles.importedAt))
+    .limit(limit);
 }
 
 // ── Progress helpers (userId-scoped) ──────────────────────────────────────────

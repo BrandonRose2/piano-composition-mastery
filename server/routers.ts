@@ -12,6 +12,7 @@ import {
   getProgressForComposition,
   toggleDayProgress,
   getDb,
+  listImportedFiles,
 } from "./db";
 import { storagePut } from "./storage";
 import { analyzeComposition } from "./analyzeComposition";
@@ -696,6 +697,11 @@ export const appRouter = router({
         return { success: true };
       }),
   }),
+  autoImport: router({
+    /** List recent auto-import history */
+    list: protectedProcedure.query(async () => {
+      return listImportedFiles(100);
+    }),
+  }),
 });
-
 export type AppRouter = typeof appRouter;

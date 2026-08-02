@@ -8,7 +8,7 @@ import { useState, useCallback, useRef, useEffect } from "react";
 import { useLocation } from "wouter";
 import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
-import { Music, Upload, BookOpen, ChevronRight, Loader2, AlertCircle, CheckCircle2, Clock, Trash2, Youtube, ExternalLink, LogOut, User, Search, FileText, X, Download, Import, Link, Sparkles, ArrowRight, Check, Globe } from "lucide-react";
+import { Music, Upload, BookOpen, ChevronRight, Loader2, AlertCircle, CheckCircle2, Clock, Trash2, Youtube, ExternalLink, LogOut, User, Search, FileText, X, Download, Import, Link, Sparkles, ArrowRight, Check, Globe, FolderOpen } from "lucide-react";
 import { useAuth } from "@/_core/hooks/useAuth";
 
 // ── Asset URLs ────────────────────────────────────────────────────────────────
@@ -435,6 +435,16 @@ function NavBar() {
             <User size={12} className="text-[oklch(0.78_0.12_85)]" />
             <span>{user.username ?? user.name ?? user.email ?? "Pianist"}</span>
           </div>
+          <a
+            href="/auto-import"
+            className="hidden sm:flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-mono
+              text-[oklch(0.68_0.012_265)] border border-[oklch(0.22_0.016_265)]
+              hover:text-[oklch(0.78_0.12_85)] hover:border-[oklch(0.78_0.12_85)/40]
+              transition-all duration-150 active:scale-95"
+            title="Auto-Import Settings"
+          >
+            <FolderOpen size={11} /><span className="ml-1">Auto-Import</span>
+          </a>
           <button
             onClick={() => logout()}
             className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-mono

@@ -73,3 +73,28 @@ export const practiceProgress = mysqlTable("practice_progress", {
 });
 
 export type PracticeProgress = typeof practiceProgress.$inferSelect;
+
+/**
+ * Tracks files that have been auto-imported from the Downloads folder
+ * so the weekly agent cron never imports the same file twice.
+ */
+export const importedFiles = mysqlTable("imported_files", {
+  id: int("id").autoincrement().primaryKey(),
+  /** Original filename from the Downloads folder */
+  filename: varchar("filename", { length: 512 }).notNull(),
+  /** Full path on the desktop mount at time of import */
+  filePath: varchar("filePath", { length: 1024 }),
+  /** File size in bytes */
+  fileSize: int("fileSize"),
+  /** Status of the import */
+  status: mysqlEnum("status", ["imported", "skipped", "error"]).default("imported").notNull(),
+  /** Linked composition if successfully imported */
+  compositionId: int("compositionId"),
+  /** Error message if import failed */
+  errorMessage: text("errorMessage"),
+  /** When the file was imported */
+  importedAt: timestamp("importedAt").defaultNow().notNull(),
+});
+
+export type ImportedFile = typeof importedFiles.$inferSelect;
+export type InsertImportedFile = typeof importedFiles.$inferInsert;

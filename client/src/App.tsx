@@ -7,6 +7,7 @@ import { ThemeProvider } from "./contexts/ThemeContext";
 import Home from "./pages/Home";
 import CompositionDetail from "./pages/CompositionDetail";
 import Landing from "./pages/Landing";
+import AutoImport from "./pages/AutoImport";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { Loader2 } from "lucide-react";
 
@@ -51,6 +52,12 @@ function Router() {
       <Route path={"/composition/:id"}>
         <AuthGuard>
           <CompositionDetail />
+        </AuthGuard>
+      </Route>
+
+      <Route path={"/auto-import"}>
+        <AuthGuard>
+          <AutoImport />
         </AuthGuard>
       </Route>
 

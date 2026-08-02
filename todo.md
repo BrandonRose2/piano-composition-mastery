@@ -58,3 +58,13 @@
 ## Retry Analysis
 - [x] Backend: retryAnalysis tRPC mutation — re-fetch file from S3, re-run analyzeComposition, update status
 - [x] Frontend: show "Retry" button on error cards in the library (inline next to error message)
+
+## Weekly Auto-Import from Downloads Folder
+- [x] Add `imported_files` table to schema: filename, filePath, importedAt, compositionId (nullable), status
+- [x] Add `getImportedFilenames`, `recordImportedFile`, `listImportedFiles` helpers to db.ts
+- [x] Add `autoImport.list` tRPC procedure
+- [x] Add `/api/scheduled/auto-import` Express handler that accepts PDF uploads from the AGENT cron
+- [x] Register `/api/scheduled/auto-import` in server/_core/index.ts
+- [x] Create AGENT cron via manus-config schedule (every Sunday 9 AM UTC, taskUid: gkPG1zk4auEHTrVhxz68oR)
+- [x] Frontend: Auto-Import page at /auto-import showing schedule info, stats, and import history
+- [x] Frontend: Route registered in App.tsx with AuthGuard
