@@ -97,9 +97,9 @@
 - [x] Auto-Import: keep Import History table and stats intact
 
 ## Scribd Saved Docs Search (priority fix)
-- [ ] Backend: add searchScribdSaved() — fetch user's Scribd saved list and fuzzy-match by composition name
-- [ ] Backend: make saved-docs search the FIRST step in both Spotify and YouTube finder pipelines
-- [ ] Frontend: show "From your Scribd library" badge on results that came from saved docs
+- [x] Backend: add searchScribdSaved() — fuzzy-match cached saved docs by composition name (per-user)
+- [x] Backend: finder injects saved-docs matches at top of results for both Spotify and YouTube pipelines
+- [x] Frontend: show "Your Scribd Library ★" gold badge on results that came from saved docs
 
 ## Sync Scribd Library Feature
 - [x] DB: add scribd_saved_docs table (docId, title, url, slug, syncedAt)

@@ -740,17 +740,30 @@ function YouTubeSheetMusicFinder() {
                   </div>
                   <div className="flex flex-col items-end gap-1.5 shrink-0">
                     <div className="flex items-center gap-2">
-                      <a
-                        href={src.previewUrl ?? src.url}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="flex items-center gap-1 text-xs text-[oklch(0.55_0.015_265)] hover:text-[oklch(0.78_0.12_85)] transition-colors px-2 py-1.5 rounded-lg border border-[oklch(0.25_0.012_265)] hover:border-[oklch(0.78_0.12_85/0.4)]"
-                      >
-                        <ExternalLink size={11} />
-                        {src.source === "scribd" ? "Open in Scribd" :
-                         src.source === "imslp" ? "Open IMSLP" :
-                         src.source === "musescore" ? "Browse MuseScore" : "Open"}
-                      </a>
+                      {/* Prominent gold CTA for user's own Scribd library */}
+                      {src.source === "scribd_saved" ? (
+                        <a
+                          href={src.url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="flex items-center gap-1.5 text-xs font-semibold bg-[oklch(0.78_0.18_85)] text-[oklch(0.12_0.018_265)] px-3 py-1.5 rounded-lg hover:bg-[oklch(0.85_0.18_85)] active:scale-[0.97] transition-all duration-150"
+                        >
+                          <ExternalLink size={11} />
+                          Open in Scribd
+                        </a>
+                      ) : (
+                        <a
+                          href={src.previewUrl ?? src.url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="flex items-center gap-1 text-xs text-[oklch(0.55_0.015_265)] hover:text-[oklch(0.78_0.12_85)] transition-colors px-2 py-1.5 rounded-lg border border-[oklch(0.25_0.012_265)] hover:border-[oklch(0.78_0.12_85/0.4)]"
+                        >
+                          <ExternalLink size={11} />
+                          {src.source === "scribd" ? "Open in Scribd" :
+                           src.source === "imslp" ? "Open IMSLP" :
+                           src.source === "musescore" ? "Browse MuseScore" : "Open"}
+                        </a>
+                      )}
                       {isImported ? (
                         <span className="flex items-center gap-1 text-xs text-emerald-400 px-2 py-1.5">
                           <Check size={11} /> Imported
