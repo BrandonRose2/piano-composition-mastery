@@ -535,6 +535,7 @@ type FinderResult = {
 };
 
 function sourceLabel(source: string) {
+  if (source === "scribd_saved") return { label: "Your Scribd Library ★", color: "oklch(0.82_0.18_85)", bg: "oklch(0.50_0.18_85/0.20)", border: "oklch(0.60_0.18_85/0.50)" };
   if (source === "scribd") return { label: "Scribd", color: "oklch(0.72_0.14_145)", bg: "oklch(0.42_0.14_145/0.15)", border: "oklch(0.42_0.14_145/0.35)" };
   if (source === "youtube_description") return { label: "YouTube Description", color: "oklch(0.68_0.20_25)", bg: "oklch(0.45_0.22_25/0.15)", border: "oklch(0.45_0.22_25/0.35)" };
   if (source === "youtube_comments") return { label: "YouTube Comments", color: "oklch(0.68_0.20_25)", bg: "oklch(0.45_0.22_25/0.15)", border: "oklch(0.45_0.22_25/0.35)" };

@@ -98,3 +98,29 @@ export const importedFiles = mysqlTable("imported_files", {
 
 export type ImportedFile = typeof importedFiles.$inferSelect;
 export type InsertImportedFile = typeof importedFiles.$inferInsert;
+
+/**
+ * Cached list of documents saved in the user's Scribd account.
+ * Populated by the "Sync Scribd Library" button on the Auto-Import page.
+ * Used by the sheet music finder to check the user's own library first.
+ */
+export const scribdSavedDocs = mysqlTable("scribd_saved_docs", {
+  id: int("id").autoincrement().primaryKey(),
+  /** Owner of this cached entry */
+  userId: int("userId").notNull(),
+  /** Scribd document ID (numeric string) — unique per user */
+  docId: varchar("docId", { length: 64 }).notNull(),
+  /** Document title as shown on Scribd */
+  title: varchar("title", { length: 512 }).notNull(),
+  /** Full Scribd URL e.g. https://www.scribd.com/document/123/slug */
+  url: varchar("url", { length: 1024 }).notNull(),
+  /** URL slug for display */
+  slug: varchar("slug", { length: 512 }),
+  /** Thumbnail image URL if available */
+  thumbnailUrl: varchar("thumbnailUrl", { length: 1024 }),
+  /** When this record was last synced */
+  syncedAt: timestamp("syncedAt").defaultNow().notNull(),
+});
+
+export type ScribdSavedDoc = typeof scribdSavedDocs.$inferSelect;
+export type InsertScribdSavedDoc = typeof scribdSavedDocs.$inferInsert;

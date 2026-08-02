@@ -4,7 +4,7 @@ import { useAuth } from "@/_core/hooks/useAuth";
 import { getLoginUrl } from "@/const";
 import {
   CheckCircle, XCircle, SkipForward, Clock, FolderOpen,
-  RefreshCw, Calendar, Upload, FileText, X
+  RefreshCw, Calendar, Upload, FileText, X, BookOpen, Library, ExternalLink
 } from "lucide-react";
 
 type ImportStatus = "imported" | "skipped" | "error";
@@ -50,6 +50,64 @@ export default function AutoImport() {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const uploadFile = trpc.autoImport.uploadFile.useMutation();
+
+  // Scribd sync state
+  const [isSyncing, setIsSyncing] = useState(false);
+  const [syncResult, setSyncResult] = useState<{ synced: number; error?: string } | null>(null);
+  const { data: savedDocs, refetch: refetchSaved } = trpc.scribd.getSavedDocs.useQuery(undefined, { enabled: !!user });
+  const syncSaved = trpc.scribd.syncSaved.useMutation();
+
+  /**
+   * Scrape the user's Scribd saved list from the browser (works because the user is logged in),
+   * then send the list to the server to cache in the DB.
+   */
+  const syncScribdLibrary = async () => {
+    setIsSyncing(true);
+    setSyncResult(null);
+    try {
+      // Fetch the Scribd saved list page through the browser
+      const res = await fetch("https://www.scribd.com/reading-list/saved", {
+        credentials: "include",
+        headers: { "Accept": "text/html,application/xhtml+xml,*/*" },
+      });
+      const html = await res.text();
+
+      // Extract document links from the HTML
+      const docs: { docId: string; title: string; url: string; slug: string }[] = [];
+      const seen = new Set<string>();
+
+      // Pattern 1: href="/document/123/slug-title"
+      const docPattern = /href="\/document\/(\d+)\/([^"?#]+)"/g;
+      let m;
+      while ((m = docPattern.exec(html)) !== null) {
+        const docId = m[1];
+        const slug = m[2];
+        if (seen.has(docId)) continue;
+        seen.add(docId);
+        const title = slug.replace(/-/g, " ").replace(/\b\w/g, c => c.toUpperCase());
+        docs.push({
+          docId,
+          title,
+          url: `https://www.scribd.com/document/${docId}/${slug}`,
+          slug,
+        });
+      }
+
+      if (docs.length === 0) {
+        // Scribd returned a JS-only page — open it in a new tab so user can log in
+        setSyncResult({ synced: 0, error: "Scribd returned a login/challenge page. Make sure you are logged into Scribd in this browser, then try again." });
+        setIsSyncing(false);
+        return;
+      }
+
+      const result = await syncSaved.mutateAsync(docs);
+      setSyncResult({ synced: result.synced });
+      refetchSaved();
+    } catch (err) {
+      setSyncResult({ synced: 0, error: err instanceof Error ? err.message : String(err) });
+    }
+    setIsSyncing(false);
+  };
 
   const addFiles = useCallback((newFiles: File[]) => {
     const pdfs = newFiles.filter(f => f.name.toLowerCase().endsWith(".pdf"));
@@ -287,6 +345,75 @@ export default function AutoImport() {
                     </span>
                   )}
                   <span className="text-[#8a7a5a] text-xs self-center">AI analysis running in background</span>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+
+        {/* Sync Scribd Library card */}
+        <div className="bg-[#111] border border-[#c9a84c]/20 rounded-xl p-6 space-y-4">
+          <div className="flex items-start gap-4">
+            <div className="w-10 h-10 rounded-lg bg-[#c9a84c]/10 border border-[#c9a84c]/20 flex items-center justify-center flex-shrink-0">
+              <Library className="w-5 h-5 text-[#c9a84c]" />
+            </div>
+            <div className="flex-1">
+              <h2 className="text-[#e8d5a3] font-semibold mb-1">Sync Scribd Library</h2>
+              <p className="text-[#8a7a5a] text-sm leading-relaxed">
+                Cache your Scribd saved documents so the sheet music finder can check <strong className="text-[#c9a84c]">your own library first</strong> when you paste a Spotify or YouTube link.
+                {savedDocs && savedDocs.length > 0 && (
+                  <span className="ml-1 text-[#c9a84c]">{savedDocs.length} docs cached.</span>
+                )}
+              </p>
+            </div>
+            <button
+              onClick={syncScribdLibrary}
+              disabled={isSyncing}
+              className="flex items-center gap-2 px-4 py-2 bg-[#c9a84c] text-black font-semibold rounded-lg hover:bg-[#b8973b] disabled:opacity-50 disabled:cursor-not-allowed transition-all active:scale-[0.98] text-sm flex-shrink-0"
+            >
+              {isSyncing ? (
+                <><div className="w-3.5 h-3.5 border-2 border-black border-t-transparent rounded-full animate-spin" /> Syncing...</>
+              ) : (
+                <><RefreshCw className="w-3.5 h-3.5" /> Sync Now</>
+              )}
+            </button>
+          </div>
+
+          {/* Sync result feedback */}
+          {syncResult && (
+            <div className={`px-4 py-3 rounded-lg text-sm ${
+              syncResult.error
+                ? "bg-red-900/20 border border-red-800 text-red-400"
+                : "bg-green-900/20 border border-green-800 text-green-400"
+            }`}>
+              {syncResult.error
+                ? syncResult.error
+                : `✓ ${syncResult.synced} Scribd documents cached. The sheet music finder will now check your library first.`
+              }
+            </div>
+          )}
+
+          {/* Cached docs preview */}
+          {savedDocs && savedDocs.length > 0 && (
+            <div className="bg-[#0d0d0d] rounded-lg divide-y divide-[#1a1a1a] max-h-48 overflow-y-auto">
+              {savedDocs.slice(0, 20).map(doc => (
+                <div key={doc.docId} className="px-4 py-2.5 flex items-center gap-3">
+                  <BookOpen className="w-3.5 h-3.5 text-[#c9a84c]/50 flex-shrink-0" />
+                  <span className="flex-1 text-xs text-[#e8d5a3] truncate">{doc.title}</span>
+                  <a
+                    href={doc.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    onClick={e => e.stopPropagation()}
+                    className="text-[#c9a84c]/50 hover:text-[#c9a84c] transition-colors flex-shrink-0"
+                  >
+                    <ExternalLink className="w-3 h-3" />
+                  </a>
+                </div>
+              ))}
+              {savedDocs.length > 20 && (
+                <div className="px-4 py-2 text-xs text-[#6a5a3a] text-center">
+                  +{savedDocs.length - 20} more
                 </div>
               )}
             </div>

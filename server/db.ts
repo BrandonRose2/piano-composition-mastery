@@ -1,6 +1,6 @@
 import { eq, desc, and } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/mysql2";
-import { InsertUser, users, compositions, practiceProgress, importedFiles, type InsertComposition, type InsertImportedFile } from "../drizzle/schema";
+import { InsertUser, users, compositions, practiceProgress, importedFiles, scribdSavedDocs, type InsertComposition, type InsertImportedFile, type InsertScribdSavedDoc, type ScribdSavedDoc } from "../drizzle/schema";
 import { ENV } from './_core/env';
 
 let _db: ReturnType<typeof drizzle> | null = null;
@@ -231,4 +231,49 @@ export async function toggleDayProgress(
       notes: notes ?? null,
     });
   }
+}
+
+/** Upsert a batch of Scribd saved docs (from browser sync) */
+export async function upsertScribdSavedDocs(docs: InsertScribdSavedDoc[]): Promise<void> {
+  const db = await getDb();
+  if (!db || docs.length === 0) return;
+  // Upsert each doc — update title/url/slug/thumbnailUrl and refresh syncedAt on conflict
+  for (const doc of docs) {
+    await db
+      .insert(scribdSavedDocs)
+      .values({ ...doc, syncedAt: new Date() })
+      .onDuplicateKeyUpdate({
+        set: {
+          title: doc.title,
+          url: doc.url,
+          slug: doc.slug ?? null,
+          thumbnailUrl: doc.thumbnailUrl ?? null,
+          syncedAt: new Date(),
+        },
+      });
+  }
+}
+
+/** Return all cached Scribd saved docs for a user, newest sync first */
+export async function listScribdSavedDocs(userId: number): Promise<ScribdSavedDoc[]> {
+  const db = await getDb();
+  if (!db) return [];
+  return db.select().from(scribdSavedDocs)
+    .where(eq(scribdSavedDocs.userId, userId))
+    .orderBy(desc(scribdSavedDocs.syncedAt));
+}
+
+/** Fuzzy-search cached Scribd saved docs by title keywords, scoped to a user */
+export async function searchScribdSavedDocs(query: string, userId: number): Promise<ScribdSavedDoc[]> {
+  const db = await getDb();
+  if (!db) return [];
+  const all = await db.select().from(scribdSavedDocs)
+    .where(eq(scribdSavedDocs.userId, userId))
+    .orderBy(desc(scribdSavedDocs.syncedAt));
+  const keywords = query.toLowerCase().split(/\s+/).filter(k => k.length > 2);
+  if (keywords.length === 0) return all.slice(0, 10);
+  return all.filter(doc => {
+    const haystack = (doc.title + " " + (doc.slug ?? "")).toLowerCase();
+    return keywords.some(kw => haystack.includes(kw));
+  });
 }

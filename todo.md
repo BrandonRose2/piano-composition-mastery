@@ -95,3 +95,16 @@
 - [x] Auto-Import: wire browser file upload to S3 + AI analysis pipeline (same as main upload zone)
 - [x] Auto-Import: show per-file status icons during batch upload (spinner → checkmark/skip/error)
 - [x] Auto-Import: keep Import History table and stats intact
+
+## Scribd Saved Docs Search (priority fix)
+- [ ] Backend: add searchScribdSaved() — fetch user's Scribd saved list and fuzzy-match by composition name
+- [ ] Backend: make saved-docs search the FIRST step in both Spotify and YouTube finder pipelines
+- [ ] Frontend: show "From your Scribd library" badge on results that came from saved docs
+
+## Sync Scribd Library Feature
+- [x] DB: add scribd_saved_docs table (docId, title, url, slug, syncedAt)
+- [x] Backend: scribd.syncSaved mutation — accepts array of {docId, title, url} from browser, upserts into DB
+- [x] Backend: scribd.getSavedDocs query — returns all cached saved docs
+- [x] Backend: update sheet music finder to check scribd_saved_docs cache first before public search
+- [x] Frontend: Sync Scribd Library button on Auto-Import page (browser scrapes saved list, sends to server)
+- [x] Frontend: show "Your Scribd Library ★" gold badge on matched results in sheet music finder

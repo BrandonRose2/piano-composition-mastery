@@ -13,6 +13,9 @@ import {
   toggleDayProgress,
   getDb,
   listImportedFiles,
+  upsertScribdSavedDocs,
+  listScribdSavedDocs,
+  searchScribdSavedDocs,
 } from "./db";
 import { storagePut } from "./storage";
 import { analyzeComposition } from "./analyzeComposition";
@@ -493,7 +496,7 @@ export const appRouter = router({
    */
   findSheetMusic: protectedProcedure
     .input(z.object({ url: z.string().min(1) }))
-    .mutation(async ({ input }) => {
+      .mutation(async ({ input, ctx }) => {
       const cookie = ENV.scribdSessionCookie;
       if (!cookie) {
         throw new Error("Scribd session cookie not configured. Please contact the portal admin.");
@@ -506,6 +509,38 @@ export const appRouter = router({
         result = await findSheetMusicFromYouTube(url, cookie);
       }
       if (result.error) throw new Error(result.error);
+
+      // Inject cached Scribd saved docs as top results if they match the identified composition
+      try {
+        const compositionName = result.compositionName ?? "";
+        const composer = result.composer ?? "";
+        const searchQuery = `${composer} ${compositionName}`.trim();
+        if (searchQuery.length > 3) {
+          const savedMatches = await searchScribdSavedDocs(searchQuery, ctx.user.id);
+          if (savedMatches.length > 0) {
+            const savedResults = savedMatches.map(doc => ({
+              source: "scribd_saved" as const,
+              title: doc.title,
+              url: doc.url,
+              previewUrl: doc.url,
+              canImportDirectly: false,
+              confidence: "high" as const,
+              notes: "From your Scribd library",
+            }));
+            // Prepend saved results before any other Scribd results
+            result = {
+              ...result,
+              sources: [
+                ...savedResults,
+                ...(result.sources ?? []).filter((r: { source: string }) => r.source !== "scribd"),
+              ],
+            };
+          }
+        }
+      } catch (_e) {
+        // Non-fatal — continue with original results
+      }
+
       return result;
     }),
 
@@ -784,6 +819,37 @@ export const appRouter = router({
           await recordImportedFile({ filename: input.fileName, filePath: "", compositionId: null, status: "error", errorMessage: msg });
           throw new Error(msg);
         }
+      }),
+  }),
+
+  /** Scribd saved library cache — sync from browser, search locally */
+  scribd: router({
+    /** Upsert a batch of docs scraped from the browser into the local cache */
+    syncSaved: protectedProcedure
+      .input(z.array(z.object({
+        docId: z.string(),
+        title: z.string(),
+        url: z.string(),
+        slug: z.string().optional(),
+        thumbnailUrl: z.string().optional(),
+      })))
+      .mutation(async ({ input, ctx }) => {
+        const docsWithUser = input.map(d => ({ ...d, userId: ctx.user.id }));
+        await upsertScribdSavedDocs(docsWithUser);
+        return { synced: input.length };
+      }),
+
+    /** Return all cached saved docs for the current user */
+    getSavedDocs: protectedProcedure
+      .query(async ({ ctx }) => {
+        return listScribdSavedDocs(ctx.user.id);
+      }),
+
+    /** Fuzzy-search cached saved docs by composition/composer name */
+    searchSaved: protectedProcedure
+      .input(z.object({ query: z.string() }))
+      .query(async ({ input, ctx }) => {
+        return searchScribdSavedDocs(input.query, ctx.user.id);
       }),
   }),
 });
