@@ -65,27 +65,37 @@ async function getSpotifyMetadata(spotifyUrl: string): Promise<{
   }
 }
 
-/** Use AI to extract composition name + composer from a Spotify track title */
+/** Use AI to extract composition name + composer from a Spotify track title.
+ * Preserves arranger/performer context — if the track is an arrangement or variation,
+ * the search uses BOTH the arranger's name AND the original composer.
+ */
 async function identifyCompositionFromSpotify(
   trackTitle: string
-): Promise<{ compositionName: string; composer: string }> {
-  const prompt = `You are a classical music expert. Given the following Spotify track title, identify the piano composition and its composer.
+): Promise<{ compositionName: string; composer: string; arranger?: string; isArrangement?: boolean }> {
+  const prompt = `You are a music expert. Given the following Spotify track title, identify the composition for sheet music search purposes.
 
 SPOTIFY TRACK TITLE: "${trackTitle}"
 
-Extract:
-1. The exact composition name (e.g. "Nocturne in E-flat major, Op. 9 No. 2")
-2. The composer's full name (e.g. "Frédéric Chopin")
+IMPORTANT RULES:
+1. If the track is a VARIATION, ARRANGEMENT, TRANSCRIPTION, or COVER by a specific artist (e.g. "Mozart Variation" by Florian Christl, or "Clair de Lune (Piano Cover)" by someone), then:
+   - compositionName = the SPECIFIC arrangement title as listed (e.g. "Mozart Variation (After Serenade K. 250 Haffner)")
+   - composer = the ARRANGER/PERFORMER (e.g. "Florian Christl"), NOT the original composer
+   - isArrangement = true
+   - originalComposer = the original composer if identifiable (e.g. "Wolfgang Amadeus Mozart")
+2. If the track IS the original classical piece performed straight (no variation/arrangement label), then:
+   - compositionName = the standard composition name (e.g. "Nocturne in E-flat major, Op. 9 No. 2")
+   - composer = the original composer (e.g. "Frédéric Chopin")
+   - isArrangement = false
+3. If it is a modern/pop/original piece, use the track title and performing artist.
 
-If this is a modern/pop piece, use the track title as the composition name and the artist as composer.
-
-Respond ONLY with a JSON object: {"compositionName": "...", "composer": "..."}`;
+Respond ONLY with a JSON object:
+{"compositionName": "...", "composer": "...", "isArrangement": true/false, "originalComposer": "...or null"}`;
 
   try {
     const response = await invokeLLM({
       model: "claude-haiku-4-5",
       messages: [{ role: "user", content: prompt }],
-      max_tokens: 200,
+      max_tokens: 300,
     });
     const raw = response.choices[0]?.message?.content;
     const text = typeof raw === "string" ? raw
@@ -97,9 +107,11 @@ Respond ONLY with a JSON object: {"compositionName": "...", "composer": "..."}`;
     return {
       compositionName: parsed.compositionName ?? trackTitle,
       composer: parsed.composer ?? "Unknown",
+      arranger: parsed.isArrangement ? parsed.composer : undefined,
+      isArrangement: parsed.isArrangement ?? false,
     };
   } catch {
-    return { compositionName: trackTitle, composer: "Unknown" };
+    return { compositionName: trackTitle, composer: "Unknown", isArrangement: false };
   }
 }
 
@@ -479,16 +491,31 @@ export async function findSheetMusicFromSpotify(
 
   console.log(`[SheetFinder] Spotify track: "${trackTitle}"`);
 
-  // Step 2: Identify composition + composer via AI
-  const { compositionName, composer } = await identifyCompositionFromSpotify(trackTitle);
-  console.log(`[SheetFinder] Identified: "${compositionName}" by ${composer}`);
+  // Step 2: Identify composition + composer via AI (preserves arranger context)
+  const identified = await identifyCompositionFromSpotify(trackTitle);
+  const { compositionName, composer, isArrangement } = identified;
+  console.log(`[SheetFinder] Identified: "${compositionName}" by ${composer} (arrangement: ${isArrangement})`);
 
-  // Step 3–5: Run searches in parallel (no YouTube description/comments for Spotify)
-  const [scribdResults, imslpResults, musescoreResults] = await Promise.all([
+  // Step 3–5: Run searches in parallel
+  // For arrangements, search for BOTH the specific arrangement AND the original
+  const searchPromises: Promise<SheetMusicResult[]>[] = [
     searchScribd(compositionName, composer, scribdSessionCookie),
     searchImslp(compositionName, composer),
     searchMusescore(compositionName, composer),
-  ]);
+  ];
+
+  const results = await Promise.all(searchPromises);
+  let [scribdResults, imslpResults, musescoreResults] = results;
+
+  // If it's an arrangement and we found few results, also search for the original
+  if (isArrangement && scribdResults.length + imslpResults.length < 3) {
+    // Re-run with just the arranger name to find their specific sheet music
+    const arrangerScribd = await searchScribd(compositionName, composer, scribdSessionCookie);
+    // Also search MuseScore specifically for the arranger
+    const arrangerMusescore = await searchMusescore(compositionName, composer);
+    scribdResults = [...scribdResults, ...arrangerScribd];
+    musescoreResults = [...musescoreResults, ...arrangerMusescore];
+  }
 
   // Merge and deduplicate
   const seen = new Set<string>();
@@ -504,11 +531,16 @@ export async function findSheetMusicFromSpotify(
 
   console.log(`[SheetFinder] Spotify search found ${allSources.length} sources`);
 
+  // Build a clear display name that shows both arranger and original if applicable
+  const displayComposer = isArrangement
+    ? `${composer} (arr. of ${trackTitle})`
+    : composer;
+
   return {
     videoId: "",          // not a YouTube video
     videoTitle: trackTitle,
     compositionName,
-    composer,
+    composer: displayComposer,
     sources: allSources,
   };
 }
