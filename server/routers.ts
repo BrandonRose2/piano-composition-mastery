@@ -715,7 +715,9 @@ export const appRouter = router({
     /** Immediately scan the desktop Downloads folder and import new PDFs */
     runNow: protectedProcedure.mutation(async ({ ctx }) => {
       const userId = ctx.user.id;
-      // Scan the dedicated Piano sheet music folder on the connected Mac desktop
+      // Scan the dedicated Piano sheet music folder — mounted from OneDrive Personal
+      // The folder is: ~/Library/CloudStorage/OneDrive-Personal/Piano - New Music to Learn
+      // which is mounted at /mnt/desktop/Piano - New Music to Learn by the Manus desktop connector
       const pianoFolder = "/mnt/desktop/Piano - New Music to Learn";
       let files: string[] = [];
       try {
@@ -726,7 +728,7 @@ export const appRouter = router({
       } catch {
         throw new Error(
           "Could not access the 'Piano - New Music to Learn' folder. " +
-          "Make sure your Mac is connected and the folder exists on your Desktop."
+          "Make sure your Mac is connected and the OneDrive Personal folder 'Piano - New Music to Learn' is accessible."
         );
       }
 

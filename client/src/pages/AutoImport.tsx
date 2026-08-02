@@ -92,7 +92,7 @@ export default function AutoImport() {
             <div>
               <h2 className="text-[#e8d5a3] font-semibold">Run Import Now</h2>
               <p className="text-[#8a7a5a] text-sm mt-1">
-                Immediately scan your <strong className="text-[#c9a84c]">Piano - New Music to Learn</strong> folder on your Mac and import any new PDFs into your library.
+                Immediately scan your <strong className="text-[#c9a84c]">Piano - New Music to Learn</strong> folder on your OneDrive Personal and import any new PDFs into your library.
               </p>
             </div>
             <button
@@ -154,7 +154,7 @@ export default function AutoImport() {
             <div className="flex-1">
               <h2 className="text-[#e8d5a3] font-semibold mb-1">Weekly Auto-Import Schedule</h2>
               <p className="text-[#8a7a5a] text-sm leading-relaxed">
-                Every Sunday at 9:00 AM UTC, a Manus agent scans your <strong className="text-[#c9a84c]">Piano - New Music to Learn</strong> folder on your Mac Desktop for new PDFs.
+                Every Sunday at 9:00 AM UTC, a Manus agent scans your <strong className="text-[#c9a84c]">Piano - New Music to Learn</strong> folder on your OneDrive Personal for new PDFs.
                 Any PDFs not previously imported are automatically uploaded to your library and analyzed by AI.
               </p>
               <div className="mt-3 flex flex-wrap gap-4 text-sm">
@@ -164,7 +164,7 @@ export default function AutoImport() {
                 </div>
                 <div className="flex items-center gap-1.5 text-[#8a7a5a]">
                   <FolderOpen className="w-3.5 h-3.5 text-[#c9a84c]" />
-                  <span>Scans: ~/Desktop/Piano - New Music to Learn/</span>
+                  <span>Scans: OneDrive Personal / Piano - New Music to Learn/</span>
                 </div>
               </div>
               {lastRun && (
@@ -206,7 +206,7 @@ export default function AutoImport() {
               <FolderOpen className="w-12 h-12 text-[#3a3a3a] mb-4" />
               <p className="text-[#8a7a5a] font-medium">No imports yet</p>
               <p className="text-[#6a5a3a] text-sm mt-1">
-                The weekly agent will run every Sunday and automatically import new PDFs from your 'Piano - New Music to Learn' folder on your Mac Desktop.
+                The weekly agent will run every Sunday and automatically import new PDFs from your 'Piano - New Music to Learn' folder on your OneDrive Personal.
               </p>
             </div>
           ) : (
@@ -249,11 +249,11 @@ export default function AutoImport() {
           <h2 className="text-[#e8d5a3] font-semibold mb-4">How It Works</h2>
           <ol className="space-y-3">
             {[
-              "Every Sunday at 9 AM UTC, a Manus agent wakes up and scans your 'Piano - New Music to Learn' folder on your Mac Desktop",
+              "Every Sunday at 9 AM UTC, a Manus agent wakes up and scans your 'Piano - New Music to Learn' folder on your OneDrive Personal",
               "It finds all PDF files not previously imported (tracked by filename in the database)",
               "Each new PDF is uploaded to your portal's secure storage and added to your library",
               "The AI immediately analyzes each piece and generates a 30-day practice framework",
-              "Tip: drop any new Scribd PDFs into that folder and they'll be picked up automatically!",
+              "Tip: drop any new Scribd PDFs into your OneDrive 'Piano - New Music to Learn' folder and they'll be picked up automatically!",
             ].map((step, i) => (
               <li key={i} className="flex items-start gap-3 text-sm text-[#8a7a5a]">
                 <span className="w-5 h-5 rounded-full bg-[#c9a84c]/10 border border-[#c9a84c]/30 text-[#c9a84c] text-xs flex items-center justify-center flex-shrink-0 mt-0.5">
