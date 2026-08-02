@@ -20,7 +20,7 @@ import {
 import { storagePut } from "./storage";
 import { analyzeComposition } from "./analyzeComposition";
 import { callDataApi } from "./_core/dataApi";
-import { findSheetMusicFromYouTube, findSheetMusicFromSpotify, isSpotifyUrl } from "./sheetMusicFinder";
+import { findSheetMusicFromYouTube, findSheetMusicFromSpotify, findSheetMusicFromText, isSpotifyUrl, extractVideoId } from "./sheetMusicFinder";
 import { ENV } from "./_core/env";
 import { sdk } from "./_core/sdk";
 import { getImportedFilenames, recordImportedFile } from "./db";
@@ -503,10 +503,18 @@ export const appRouter = router({
       }
       const url = input.url.trim();
       let result;
+      // Detect input type: Spotify link, YouTube link, or plain text query
+      const isUrl = /^https?:\/\//i.test(url);
       if (isSpotifyUrl(url)) {
         result = await findSheetMusicFromSpotify(url, cookie);
-      } else {
+      } else if (isUrl && extractVideoId(url)) {
         result = await findSheetMusicFromYouTube(url, cookie);
+      } else if (isUrl) {
+        // Generic URL — treat the URL itself as a text query
+        result = await findSheetMusicFromText(url, cookie);
+      } else {
+        // Plain text: composition name, composer, etc.
+        result = await findSheetMusicFromText(url, cookie);
       }
       if (result.error) throw new Error(result.error);
 

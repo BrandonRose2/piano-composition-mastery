@@ -8,8 +8,9 @@ import { useState, useCallback, useRef, useEffect } from "react";
 import { useLocation } from "wouter";
 import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
-import { Music, Upload, BookOpen, ChevronRight, Loader2, AlertCircle, CheckCircle2, Clock, Trash2, Youtube, ExternalLink, LogOut, User, Search, FileText, X, Download, Import, Link, Sparkles, ArrowRight, Check, Globe, FolderOpen } from "lucide-react";
+import { Music, Upload, BookOpen, ChevronRight, Loader2, AlertCircle, CheckCircle2, Clock, Trash2, Youtube, ExternalLink, LogOut, User, Search, FileText, X, Download, Import, Link, Sparkles, ArrowRight, Check, Globe, FolderOpen, Archive, Library } from "lucide-react";
 import { useAuth } from "@/_core/hooks/useAuth";
+import JSZip from "jszip";
 
 // ── Asset URLs ────────────────────────────────────────────────────────────────
 const HERO_BG = "https://d2xsxph8kpxj0f.cloudfront.net/310519663449376037/iyZgf5CgymBq6EtTfh66yp/hero_bg-DDCWpXMzKGFmMUM3oU8SpS.webp";
@@ -516,7 +517,7 @@ function StatusBadge({ status }: { status: string }) {
   );
 }
 
-// ── YouTube → Sheet Music Finder ─────────────────────────────────────────────
+// ── Unified "Find Any Piece" Finder ─────────────────────────────────────────
 type FinderResult = {
   videoId: string;
   videoTitle: string;
@@ -549,14 +550,17 @@ function isSpotifyLink(url: string) {
     /spotify\.link\//i.test(url);
 }
 
-function YouTubeSheetMusicFinder() {
+function FindAnyPiece() {
   const utils = trpc.useUtils();
   const [inputUrl, setInputUrl] = useState("");
   const [result, setResult] = useState<FinderResult | null>(null);
   const [importingUrl, setImportingUrl] = useState<string | null>(null);
   const [importedUrls, setImportedUrls] = useState<Set<string>>(new Set());
 
+  // Detect input type for icon/label
   const isSpotify = isSpotifyLink(inputUrl);
+  const isYouTube = /youtu\.be\/|youtube\.com\/watch/i.test(inputUrl);
+  const isUrl = /^https?:\/\//i.test(inputUrl.trim());
 
   const findMutation = trpc.findSheetMusic.useMutation({
     onSuccess: (data) => {
@@ -611,7 +615,7 @@ function YouTubeSheetMusicFinder() {
       <div className="flex items-center gap-3 mb-6">
         <span className="text-[oklch(0.78_0.12_85)]">♪</span>
         <div className="flex-1 h-px bg-gradient-to-r from-[oklch(0.78_0.12_85/0.4)] to-transparent" />
-        <p className="font-mono text-[0.6rem] text-[oklch(0.78_0.12_85)] uppercase tracking-[0.25em]">Find Sheet Music from YouTube or Spotify</p>
+        <p className="font-mono text-[0.6rem] text-[oklch(0.78_0.12_85)] uppercase tracking-[0.25em]">Find Any Piece — Sheet Music &amp; More</p>
         <div className="flex-1 h-px bg-gradient-to-l from-[oklch(0.78_0.12_85/0.4)] to-transparent" />
         <span className="text-[oklch(0.78_0.12_85)]">♪</span>
       </div>
@@ -629,13 +633,17 @@ function YouTubeSheetMusicFinder() {
         >
           {isSpotify
             ? <span className="shrink-0 text-[oklch(0.65_0.20_145)] text-xs font-bold">♫</span>
-            : <Youtube size={14} className="shrink-0 text-[oklch(0.68_0.20_25)]" />}
+            : isYouTube
+            ? <Youtube size={14} className="shrink-0 text-[oklch(0.68_0.20_25)]" />
+            : isUrl
+            ? <Globe size={14} className="shrink-0 text-[oklch(0.55_0.12_220)]" />
+            : <Search size={14} className="shrink-0 text-[oklch(0.55_0.08_85)]" />}
           <input
-            type="url"
+            type="text"
             value={inputUrl}
             onChange={(e) => setInputUrl(e.target.value)}
             onKeyDown={(e) => e.key === "Enter" && handleFind()}
-            placeholder="Paste a YouTube or Spotify URL (e.g. https://open.spotify.com/track/...)"
+            placeholder="Paste a Spotify link, YouTube URL, or type a composition name…"
             className="flex-1 bg-transparent text-sm text-[oklch(0.88_0.01_85)] placeholder:text-[oklch(0.38_0.012_265)] outline-none min-w-0"
           />
           {inputUrl && (
@@ -654,7 +662,7 @@ function YouTubeSheetMusicFinder() {
         </button>
       </div>
       <p className="text-xs text-[oklch(0.38_0.012_265)] text-center mb-4">
-        Paste a YouTube or Spotify URL — the portal identifies the piece and searches Scribd, IMSLP &amp; MuseScore
+        Spotify link · YouTube URL · composition name · any text — the portal identifies the piece and searches Scribd, IMSLP &amp; MuseScore
       </p>
 
       {/* Progress steps while searching */}
@@ -663,9 +671,9 @@ function YouTubeSheetMusicFinder() {
           <p className="text-xs font-mono text-[oklch(0.78_0.12_85)] uppercase tracking-widest mb-4">Searching…</p>
           <div className="space-y-2.5">
             {[
-              { label: "Identifying the composition", icon: Music },
-              { label: "Searching your Scribd subscription", icon: Search },
-              { label: isSpotify ? "Fetching Spotify track info" : "Scanning YouTube description & comments", icon: isSpotify ? Music : Youtube },
+              { label: isSpotify ? "Fetching Spotify track info" : isYouTube ? "Fetching YouTube video info" : "Identifying the composition", icon: Music },
+              { label: "Checking your Scribd saved library first", icon: Search },
+              { label: isYouTube ? "Scanning YouTube description & comments" : "Searching Scribd for sheet music", icon: isYouTube ? Youtube : Globe },
               { label: "Checking IMSLP & MuseScore", icon: Globe },
             ].map(({ label, icon: Icon }, i) => (
               <div key={i} className="flex items-center gap-3">
@@ -796,6 +804,115 @@ function YouTubeSheetMusicFinder() {
   );
 }
 
+// ── My Scribd Library ─────────────────────────────────────────────────────────
+function MyScribdLibrary() {
+  const [searchQuery, setSearchQuery] = useState("");
+  const [submittedQuery, setSubmittedQuery] = useState("");
+
+  const { data: allDocs = [], isLoading } = trpc.scribd.getSavedDocs.useQuery();
+  const { data: searchResults = [], isFetching: isSearching } = trpc.scribd.searchSaved.useQuery(
+    { query: submittedQuery },
+    { enabled: submittedQuery.length > 0 }
+  );
+
+  const docs = submittedQuery.length > 0 ? searchResults : allDocs;
+
+  const handleSearch = (e: React.FormEvent) => {
+    e.preventDefault();
+    setSubmittedQuery(searchQuery.trim());
+  };
+
+  const handleClear = () => {
+    setSearchQuery("");
+    setSubmittedQuery("");
+  };
+
+  if (isLoading) return null;
+  if (allDocs.length === 0) return null; // Don't show section if no docs cached yet
+
+  return (
+    <div className="mb-16">
+      {/* Section header */}
+      <div className="flex items-center gap-3 mb-6">
+        <span className="text-[oklch(0.78_0.12_85)]">♪</span>
+        <div className="flex-1 h-px bg-gradient-to-r from-[oklch(0.78_0.12_85/0.4)] to-transparent" />
+        <div className="flex items-center gap-2">
+          <Library size={12} className="text-[oklch(0.78_0.18_85)]" />
+          <p className="font-mono text-[0.6rem] text-[oklch(0.78_0.12_85)] uppercase tracking-[0.25em]">My Scribd Library</p>
+          <span className="font-mono text-[0.55rem] text-[oklch(0.55_0.012_265)] bg-[oklch(0.18_0.016_265)] border border-[oklch(0.26_0.014_265)] rounded-full px-2 py-0.5">
+            {allDocs.length} saved
+          </span>
+        </div>
+        <div className="flex-1 h-px bg-gradient-to-l from-[oklch(0.78_0.12_85/0.4)] to-transparent" />
+        <span className="text-[oklch(0.78_0.12_85)]">♪</span>
+      </div>
+
+      {/* Search bar */}
+      <form onSubmit={handleSearch} className="flex items-center gap-2 mb-4">
+        <div className="flex-1 flex items-center gap-2 rounded-xl border border-[oklch(0.28_0.016_265)] bg-[oklch(0.14_0.010_265)] px-3 py-2.5 focus-within:border-[oklch(0.55_0.08_85)] transition-colors">
+          <Search size={13} className="shrink-0 text-[oklch(0.45_0.012_265)]" />
+          <input
+            type="text"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder="Search your Scribd library… e.g. Chopin, Idea 25, Liszt"
+            className="flex-1 bg-transparent text-sm text-[oklch(0.88_0.01_85)] placeholder:text-[oklch(0.38_0.012_265)] outline-none min-w-0"
+          />
+          {searchQuery && (
+            <button type="button" onClick={handleClear} className="shrink-0 text-[oklch(0.40_0.012_265)] hover:text-[oklch(0.65_0.015_265)] transition-colors">
+              <X size={12} />
+            </button>
+          )}
+        </div>
+        <button
+          type="submit"
+          disabled={!searchQuery.trim() || isSearching}
+          className="shrink-0 px-4 py-2.5 rounded-xl bg-[oklch(0.78_0.12_85)] text-[oklch(0.12_0.018_265)] text-sm font-semibold disabled:opacity-40 disabled:cursor-not-allowed hover:bg-[oklch(0.85_0.12_85)] active:scale-[0.97] transition-all duration-150"
+        >
+          {isSearching ? <Loader2 size={14} className="animate-spin" /> : <Search size={14} />}
+        </button>
+      </form>
+
+      {/* Results grid */}
+      {docs.length === 0 && submittedQuery ? (
+        <div className="nocturne-card p-6 text-center border-dashed">
+          <p className="text-sm text-[oklch(0.65_0.015_265)]">No results for "{submittedQuery}" in your Scribd library.</p>
+          <p className="text-xs text-[oklch(0.40_0.012_265)] mt-1">Try a shorter keyword or browse all {allDocs.length} saved docs below.</p>
+          <button onClick={handleClear} className="mt-3 text-xs font-mono text-[oklch(0.78_0.12_85)] hover:underline">Show all</button>
+        </div>
+      ) : (
+        <div className="grid gap-2">
+          {docs.map((doc: any) => (
+            <div key={doc.docId} className="nocturne-card p-3.5 flex items-center gap-3 hover:border-[oklch(0.78_0.18_85/0.5)] hover:bg-[oklch(0.17_0.016_265)] transition-all duration-150 group">
+              <div className="w-8 h-8 rounded-lg bg-[oklch(0.78_0.18_85/0.12)] border border-[oklch(0.78_0.18_85/0.25)] flex items-center justify-center shrink-0">
+                <FileText size={13} className="text-[oklch(0.78_0.18_85)]" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm text-[oklch(0.88_0.01_85)] font-medium truncate">{doc.title}</p>
+                <p className="text-[0.6rem] font-mono text-[oklch(0.45_0.012_265)] truncate mt-0.5">{doc.url}</p>
+              </div>
+              <a
+                href={doc.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="shrink-0 flex items-center gap-1.5 text-xs font-semibold bg-[oklch(0.78_0.18_85)] text-[oklch(0.12_0.018_265)] px-3 py-1.5 rounded-lg hover:bg-[oklch(0.85_0.18_85)] active:scale-[0.97] transition-all duration-150"
+              >
+                <ExternalLink size={11} />
+                Open in Scribd
+              </a>
+            </div>
+          ))}
+          {allDocs.length > 12 && !submittedQuery && (
+            <p className="text-center text-xs text-[oklch(0.40_0.012_265)] pt-1">
+              {allDocs.length} saved docs — use search above to filter
+            </p>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ── Upload Zone ───────────────────────────────────────────────────────────────
 function UploadZone({ onUpload }: { onUpload: (file: File) => void }) {
   const [dragging, setDragging] = useState(false);
@@ -867,7 +984,7 @@ function UploadZone({ onUpload }: { onUpload: (file: File) => void }) {
       <input
         ref={inputRef}
         type="file"
-        accept=".pdf,.png,.jpg,.jpeg,.webp,.tiff,.bmp,.html,.htm"
+        accept=".pdf,.png,.jpg,.jpeg,.webp,.tiff,.bmp,.html,.htm,.zip"
         className="hidden"
         onChange={handleChange}
       />
@@ -891,13 +1008,13 @@ function UploadZone({ onUpload }: { onUpload: (file: File) => void }) {
 
           <div>
             <p className="font-['Playfair_Display'] text-base sm:text-xl font-semibold text-[oklch(0.88_0.01_85)] mb-1.5 sm:mb-2">
-              {pasting ? "Pasting…" : dragging ? "Release to upload" : "Drop your piano score here"}
+              {pasting ? "Pasting…" : dragging ? "Release to upload" : "Drop your piano score or ZIP folder here"}
             </p>
             <p className="text-sm text-[oklch(0.72_0.015_265)] mb-1">
               or <span className="text-[oklch(0.78_0.12_85)] underline underline-offset-2">click to browse</span>
             </p>
             <p className="text-xs text-[oklch(0.40_0.012_265)]">
-              PDF, PNG, JPG, WEBP, HTML
+              PDF, PNG, JPG, WEBP, HTML · <span className="text-[oklch(0.78_0.12_85)] font-semibold">ZIP</span> (batch import all PDFs inside)
             </p>
             <p className="text-xs text-[oklch(0.35_0.012_265)] mt-1">
               or <kbd className="px-1.5 py-0.5 rounded text-[0.65rem] border border-[oklch(0.28_0.016_265)] bg-[oklch(0.14_0.010_265)] font-mono">⌘V</kbd> / <kbd className="px-1.5 py-0.5 rounded text-[0.65rem] border border-[oklch(0.28_0.016_265)] bg-[oklch(0.14_0.010_265)] font-mono">Ctrl+V</kbd> to paste
@@ -1178,6 +1295,8 @@ function LaCampanellaCard() {
 // ── Main Component ────────────────────────────────────────────────────────────
 export default function Home() {
   const [uploading, setUploading] = useState(false);
+  const [zipBatch, setZipBatch] = useState<{ name: string; status: 'pending' | 'uploading' | 'done' | 'error'; error?: string }[]>([]);
+  const [zipBatchDone, setZipBatchDone] = useState(false);
   const utils = trpc.useUtils();
 
   const { data: compositions = [], isLoading } = trpc.compositions.list.useQuery();
@@ -1220,15 +1339,102 @@ export default function Home() {
   const uploadMutation = trpc.compositions.upload.useMutation({
     onSuccess: () => {
       utils.compositions.list.invalidate();
-      toast.success("Score uploaded! AI analysis is running — it will be ready in about 30 seconds.");
     },
-    onError: (err) => {
-      toast.error("Upload failed: " + err.message);
-    },
+    onError: () => {},
   });
+
+  // Upload a single PDF file (used both standalone and from ZIP batch)
+  const uploadSingleFile = useCallback(async (file: File): Promise<void> => {
+    const [base64Data, extractedText] = await Promise.all([
+      fileToBase64(file),
+      extractTextFromFile(file),
+    ]);
+    await uploadMutation.mutateAsync({
+      fileName: file.name,
+      mimeType: file.type || "application/pdf",
+      base64Data,
+      extractedText,
+    });
+    utils.compositions.list.invalidate();
+  }, [uploadMutation, utils]);
 
   const handleUpload = useCallback(async (file: File) => {
     const MAX_SIZE = 15 * 1024 * 1024; // 15MB
+
+    // ── ZIP batch import ──────────────────────────────────────────────────
+    const isZip = file.type === 'application/zip' ||
+      file.type === 'application/x-zip-compressed' ||
+      file.name.toLowerCase().endsWith('.zip');
+
+    if (isZip) {
+      try {
+        const zip = await JSZip.loadAsync(file);
+        // Collect all PDF entries (skip __MACOSX and hidden files)
+        const pdfEntries: { name: string; entry: JSZip.JSZipObject }[] = [];
+        zip.forEach((relativePath, entry) => {
+          if (entry.dir) return;
+          const lower = relativePath.toLowerCase();
+          if (lower.includes('__macosx') || lower.includes('/._')) return;
+          if (!lower.endsWith('.pdf')) return;
+          // Use just the filename, not the full path
+          const fileName = relativePath.split('/').pop() ?? relativePath;
+          pdfEntries.push({ name: fileName, entry });
+        });
+
+        if (pdfEntries.length === 0) {
+          toast.error('No PDF files found inside the ZIP.');
+          return;
+        }
+
+        // Initialize batch state
+        setZipBatch(pdfEntries.map(e => ({ name: e.name, status: 'pending' as const })));
+        setZipBatchDone(false);
+
+        let successCount = 0;
+        let errorCount = 0;
+
+        for (let i = 0; i < pdfEntries.length; i++) {
+          const { name, entry } = pdfEntries[i];
+          setZipBatch(prev => prev.map((item, idx) =>
+            idx === i ? { ...item, status: 'uploading' } : item
+          ));
+          try {
+            const arrayBuffer = await entry.async('arraybuffer');
+            if (arrayBuffer.byteLength > MAX_SIZE) {
+              setZipBatch(prev => prev.map((item, idx) =>
+                idx === i ? { ...item, status: 'error', error: 'File too large (>15MB)' } : item
+              ));
+              errorCount++;
+              continue;
+            }
+            const pdfFile = new File([arrayBuffer], name, { type: 'application/pdf' });
+            await uploadSingleFile(pdfFile);
+            setZipBatch(prev => prev.map((item, idx) =>
+              idx === i ? { ...item, status: 'done' } : item
+            ));
+            successCount++;
+          } catch (err: any) {
+            setZipBatch(prev => prev.map((item, idx) =>
+              idx === i ? { ...item, status: 'error', error: err?.message ?? 'Upload failed' } : item
+            ));
+            errorCount++;
+          }
+        }
+
+        setZipBatchDone(true);
+        if (successCount > 0) {
+          toast.success(`ZIP import complete: ${successCount} score${successCount !== 1 ? 's' : ''} imported${errorCount > 0 ? `, ${errorCount} failed` : ''}.`);
+        } else {
+          toast.error(`ZIP import failed: all ${errorCount} files had errors.`);
+        }
+        utils.compositions.list.invalidate();
+      } catch (err: any) {
+        toast.error('Could not read ZIP file: ' + (err?.message ?? 'Unknown error'));
+      }
+      return;
+    }
+
+    // ── Single file upload ────────────────────────────────────────────────
     if (file.size > MAX_SIZE) {
       toast.error("File is too large. Please upload a file under 15MB.");
       return;
@@ -1236,23 +1442,14 @@ export default function Home() {
 
     setUploading(true);
     try {
-      const [base64Data, extractedText] = await Promise.all([
-        fileToBase64(file),
-        extractTextFromFile(file),
-      ]);
-
-      await uploadMutation.mutateAsync({
-        fileName: file.name,
-        mimeType: file.type || "application/octet-stream",
-        base64Data,
-        extractedText,
-      });
-    } catch (err) {
-      // error handled by onError
+      await uploadSingleFile(file);
+      toast.success("Score uploaded! AI analysis is running — it will be ready in about 30 seconds.");
+    } catch (err: any) {
+      toast.error("Upload failed: " + (err?.message ?? 'Unknown error'));
     } finally {
       setUploading(false);
     }
-  }, [uploadMutation]);
+  }, [uploadSingleFile, utils]);
 
   return (
     <div className="min-h-screen bg-[oklch(0.12_0.018_265)] text-[oklch(0.92_0.01_85)]">
@@ -1309,10 +1506,61 @@ export default function Home() {
           <div className="flex items-center gap-3 mb-6">
             <span className="text-[oklch(0.78_0.12_85)]">♪</span>
             <div className="flex-1 h-px bg-gradient-to-r from-[oklch(0.78_0.12_85/0.4)] to-transparent" />
-            <p className="font-mono text-[0.6rem] text-[oklch(0.78_0.12_85)] uppercase tracking-[0.25em]">Upload a Score</p>
+            <p className="font-mono text-[0.6rem] text-[oklch(0.78_0.12_85)] uppercase tracking-[0.25em]">Upload a Score or ZIP Folder</p>
             <div className="flex-1 h-px bg-gradient-to-l from-[oklch(0.78_0.12_85/0.4)] to-transparent" />
             <span className="text-[oklch(0.78_0.12_85)]">♪</span>
           </div>
+
+          {/* ZIP batch progress panel */}
+          {zipBatch.length > 0 && (
+            <div className="nocturne-card p-5 mb-4">
+              <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center gap-2">
+                  <Archive size={14} className="text-[oklch(0.78_0.12_85)]" />
+                  <p className="text-sm font-semibold text-[oklch(0.88_0.01_85)]">
+                    ZIP Import — {zipBatch.filter(f => f.status === 'done').length}/{zipBatch.length} imported
+                  </p>
+                </div>
+                {zipBatchDone && (
+                  <button
+                    onClick={() => { setZipBatch([]); setZipBatchDone(false); }}
+                    className="text-xs font-mono text-[oklch(0.55_0.012_265)] hover:text-[oklch(0.78_0.12_85)] transition-colors"
+                  >
+                    Dismiss
+                  </button>
+                )}
+              </div>
+              {/* Progress bar */}
+              <div className="h-1.5 w-full rounded-full bg-[oklch(0.20_0.016_265)] overflow-hidden mb-4">
+                <div
+                  className="h-full rounded-full bg-gradient-to-r from-[oklch(0.65_0.10_85)] to-[oklch(0.78_0.12_85)] transition-all duration-500"
+                  style={{ width: `${Math.round((zipBatch.filter(f => f.status === 'done' || f.status === 'error').length / zipBatch.length) * 100)}%` }}
+                />
+              </div>
+              {/* Per-file list */}
+              <div className="space-y-1.5 max-h-64 overflow-y-auto">
+                {zipBatch.map((item, i) => (
+                  <div key={i} className="flex items-center gap-2.5 text-xs">
+                    <span className="shrink-0 w-4 h-4 flex items-center justify-center">
+                      {item.status === 'pending' && <span className="w-2 h-2 rounded-full bg-[oklch(0.35_0.010_265)]" />}
+                      {item.status === 'uploading' && <Loader2 size={12} className="text-[oklch(0.78_0.12_85)] animate-spin" />}
+                      {item.status === 'done' && <CheckCircle2 size={12} className="text-emerald-400" />}
+                      {item.status === 'error' && <AlertCircle size={12} className="text-red-400" />}
+                    </span>
+                    <span className={`flex-1 truncate font-mono ${
+                      item.status === 'done' ? 'text-[oklch(0.72_0.015_265)]' :
+                      item.status === 'error' ? 'text-red-400' :
+                      item.status === 'uploading' ? 'text-[oklch(0.88_0.01_85)]' :
+                      'text-[oklch(0.45_0.012_265)]'
+                    }`}>{item.name}</span>
+                    {item.status === 'error' && item.error && (
+                      <span className="shrink-0 text-[0.6rem] text-red-400/70">{item.error}</span>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
 
           {uploading || fetchingUrl ? (
             <div className="rounded-2xl border-2 border-dashed border-[oklch(0.78_0.12_85/0.4)] p-12 text-center">
@@ -1366,11 +1614,11 @@ export default function Home() {
           )}
         </div>
 
-        {/* YouTube → Sheet Music Finder */}
-        <YouTubeSheetMusicFinder />
+        {/* Unified Find Any Piece */}
+        <FindAnyPiece />
 
-        {/* Sheet music search */}
-        <SheetMusicSearch />
+        {/* My Scribd Library */}
+        <MyScribdLibrary />
 
         {/* Composition library */}
         <div>

@@ -398,6 +398,50 @@ async function searchMusescore(
   return results;
 }
 
+// ── Plain text search entry point ───────────────────────────────────────────
+
+/**
+ * Find sheet music from a plain text query (composition name, composer, etc.)
+ * Skips URL metadata step — uses the text directly as the search query.
+ */
+export async function findSheetMusicFromText(
+  query: string,
+  scribdSessionCookie: string
+): Promise<FinderResult> {
+  console.log(`[SheetFinder] Plain text search: "${query}"`);
+
+  // Use AI to parse the text into composition + composer
+  const identified = await identifyCompositionFromSpotify(query); // reuse same AI parser
+  const { compositionName, composer } = identified;
+  console.log(`[SheetFinder] Identified: "${compositionName}" by ${composer}`);
+
+  // Run all searches in parallel
+  const [scribdResults, imslpResults, musescoreResults] = await Promise.all([
+    searchScribd(compositionName, composer, scribdSessionCookie),
+    searchImslp(compositionName, composer),
+    searchMusescore(compositionName, composer),
+  ]);
+
+  const seen = new Set<string>();
+  const allSources: SheetMusicResult[] = [
+    ...scribdResults,
+    ...imslpResults,
+    ...musescoreResults,
+  ].filter(r => {
+    if (seen.has(r.url)) return false;
+    seen.add(r.url);
+    return true;
+  });
+
+  return {
+    videoId: "",
+    videoTitle: query,
+    compositionName,
+    composer,
+    sources: allSources,
+  };
+}
+
 // ── Main entry point ──────────────────────────────────────────────────────────
 
 export async function findSheetMusicFromYouTube(

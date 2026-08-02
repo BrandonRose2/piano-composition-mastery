@@ -118,3 +118,20 @@
 - [x] Backend: scribd.addByUrl mutation — accept a single Scribd URL, extract docId/title/slug, upsert to DB
 - [x] Frontend: replace broken Sync Now button with two-panel UI: (1) paste HTML bulk sync with step-by-step instructions, (2) single URL input with Add button
 - [x] Frontend: show live count of synced docs in header
+
+## UX Redesign: Unified "Find Any Piece" + Direct Scribd Library
+- [x] Rename "Find Sheet Music from YouTube or Spotify" → "Find Any Piece" — accepts Spotify, YouTube, plain text, or any URL
+- [x] Backend: extend findSheetMusic to accept plain text queries (not just URLs) — detect if input is a URL or plain text, if plain text run AI composition ID + search pipeline directly
+- [x] Frontend: unified input placeholder makes clear it accepts anything (Spotify link, YouTube URL, composition name, etc.)
+- [x] Frontend: results panel shows ALL results together: sheet music sources + YouTube performance video embed
+- [x] Frontend: add "My Scribd Library" section directly on Home page — searchable/browseable without needing a Spotify/YouTube link
+- [x] Frontend: Scribd library section shows all cached docs with search box, "Open in Scribd" buttons, and count
+- [x] Frontend: fix searchScribdSavedDocs keyword filter — strip punctuation, allow 2-char keywords (already done in db.ts)
+- [x] Backend: fix db.ts keyword filter (already applied — allow >= 2 chars, strip punctuation)
+
+## ZIP Folder Upload (Piano Folder Batch Import)
+- [x] Frontend: accept .zip files in the upload zone (add to file input accept attribute)
+- [x] Frontend: detect ZIP file drop/select, extract PDFs client-side using JSZip, show batch progress
+- [x] Frontend: show per-file status during ZIP extraction and upload (filename, spinner/check/skip/error)
+- [x] Backend: no changes needed — reuse existing compositions.upload mutation per PDF
+- [x] Frontend: show summary after ZIP import (X imported, Y skipped duplicates, Z errors)

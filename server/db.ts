@@ -270,10 +270,13 @@ export async function searchScribdSavedDocs(query: string, userId: number): Prom
   const all = await db.select().from(scribdSavedDocs)
     .where(eq(scribdSavedDocs.userId, userId))
     .orderBy(desc(scribdSavedDocs.syncedAt));
-  const keywords = query.toLowerCase().split(/\s+/).filter(k => k.length > 2);
+  const keywords = query.toLowerCase()
+    .replace(/[^a-z0-9\s]/g, ' ')  // strip punctuation
+    .split(/\s+/)
+    .filter(k => k.length >= 2);    // allow 2-char keywords like "25"
   if (keywords.length === 0) return all.slice(0, 10);
   return all.filter(doc => {
-    const haystack = (doc.title + " " + (doc.slug ?? "")).toLowerCase();
+    const haystack = (doc.title + " " + (doc.slug ?? "")).toLowerCase().replace(/[^a-z0-9\s]/g, ' ');
     return keywords.some(kw => haystack.includes(kw));
   });
 }
