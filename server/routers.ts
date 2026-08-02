@@ -17,7 +17,7 @@ import {
 import { storagePut } from "./storage";
 import { analyzeComposition } from "./analyzeComposition";
 import { callDataApi } from "./_core/dataApi";
-import { findSheetMusicFromYouTube } from "./sheetMusicFinder";
+import { findSheetMusicFromYouTube, findSheetMusicFromSpotify, isSpotifyUrl } from "./sheetMusicFinder";
 import { ENV } from "./_core/env";
 import { sdk } from "./_core/sdk";
 import { getImportedFilenames, recordImportedFile } from "./db";
@@ -486,18 +486,25 @@ export const appRouter = router({
   }),
 
   /**
-   * YouTube → Sheet Music finder.
-   * Given a YouTube URL, identifies the composition and searches Scribd, YouTube
-   * description/comments, IMSLP, and MuseScore for free PDF sheet music.
+   * YouTube or Spotify → Sheet Music finder.
+   * Given a YouTube URL or Spotify track/album/playlist URL, identifies the
+   * composition and searches Scribd, IMSLP, and MuseScore for free PDF sheet music.
+   * For YouTube URLs, also scans the video description and top comments.
    */
   findSheetMusic: protectedProcedure
-    .input(z.object({ youtubeUrl: z.string().min(1) }))
+    .input(z.object({ url: z.string().min(1) }))
     .mutation(async ({ input }) => {
       const cookie = ENV.scribdSessionCookie;
       if (!cookie) {
         throw new Error("Scribd session cookie not configured. Please contact the portal admin.");
       }
-      const result = await findSheetMusicFromYouTube(input.youtubeUrl, cookie);
+      const url = input.url.trim();
+      let result;
+      if (isSpotifyUrl(url)) {
+        result = await findSheetMusicFromSpotify(url, cookie);
+      } else {
+        result = await findSheetMusicFromYouTube(url, cookie);
+      }
       if (result.error) throw new Error(result.error);
       return result;
     }),
@@ -708,38 +715,27 @@ export const appRouter = router({
     /** Immediately scan the desktop Downloads folder and import new PDFs */
     runNow: protectedProcedure.mutation(async ({ ctx }) => {
       const userId = ctx.user.id;
-      // Scan the mounted desktop Downloads folder and Piano folder
-      const scanPaths = [
-        "/mnt/desktop/Users/brandonrose/Downloads",
-        "/mnt/desktop/Piano - New Music to Learn",
-      ];
+      // Scan the dedicated Piano sheet music folder on the connected Mac desktop
+      const pianoFolder = "/mnt/desktop/Piano - New Music to Learn";
       let files: string[] = [];
-      let accessErrors: string[] = [];
-      for (const scanPath of scanPaths) {
-        try {
-          const entries = fs.readdirSync(scanPath);
-          const pdfs = entries
-            .filter(f => f.toLowerCase().endsWith(".pdf"))
-            .map(f => path.join(scanPath, f));
-          files = files.concat(pdfs);
-        } catch {
-          accessErrors.push(scanPath);
-        }
-      }
-      if (files.length === 0 && accessErrors.length === scanPaths.length) {
-        throw new Error("Could not access any desktop folders. Make sure your Mac is connected.");
+      try {
+        const entries = fs.readdirSync(pianoFolder);
+        files = entries
+          .filter(f => f.toLowerCase().endsWith(".pdf"))
+          .map(f => path.join(pianoFolder, f));
+      } catch {
+        throw new Error(
+          "Could not access the 'Piano - New Music to Learn' folder. " +
+          "Make sure your Mac is connected and the folder exists on your Desktop."
+        );
       }
 
       // Get already-imported filenames to skip duplicates
       const alreadyImportedArr = await getImportedFilenames();
       const alreadyImported = new Set(alreadyImportedArr);
 
-      // Filter to only piano/music-related PDFs not yet imported
-      const pianoKeywords = /piano|sheet|music|liszt|chopin|einaudi|campanella|hanon|idea|icarus|soulmate|starry|veronika|wyden|reve|paterlini|winterwind|winter.wind|beanie|tony.ann|watson|primavera|experience|gibran|etude|opus|beethoven|mozart|bach|schubert|brahms|debussy|ravel|satie|rachmaninoff|nocturne|sonata|concerto|waltz|prelude|ballade|mazurka|polonaise|impromptu/i;
-      const newFiles = files.filter(f => {
-        const name = path.basename(f);
-        return pianoKeywords.test(name) && !alreadyImported.has(name);
-      });
+      // Since this is the dedicated Piano folder, import ALL PDFs not yet imported
+      const newFiles = files.filter(f => !alreadyImported.has(path.basename(f)));
 
       const MAX_SIZE = 20 * 1024 * 1024; // 20MB
       const results: { filename: string; status: string }[] = [];

@@ -543,18 +543,25 @@ function sourceLabel(source: string) {
   return { label: "Web", color: "oklch(0.65_0.015_265)", bg: "oklch(0.22_0.010_265/0.15)", border: "oklch(0.30_0.010_265/0.35)" };
 }
 
+function isSpotifyLink(url: string) {
+  return /open\.spotify\.com\/(track|album|playlist|artist)\//i.test(url) ||
+    /spotify\.link\//i.test(url);
+}
+
 function YouTubeSheetMusicFinder() {
   const utils = trpc.useUtils();
-  const [ytUrl, setYtUrl] = useState("");
+  const [inputUrl, setInputUrl] = useState("");
   const [result, setResult] = useState<FinderResult | null>(null);
   const [importingUrl, setImportingUrl] = useState<string | null>(null);
   const [importedUrls, setImportedUrls] = useState<Set<string>>(new Set());
+
+  const isSpotify = isSpotifyLink(inputUrl);
 
   const findMutation = trpc.findSheetMusic.useMutation({
     onSuccess: (data) => {
       setResult(data as FinderResult);
       if ((data as FinderResult).sources.length === 0) {
-        toast.info("No sheet music found. Try a different video or search manually.");
+        toast.info("No sheet music found. Try a different link or search manually.");
       }
     },
     onError: (err) => {
@@ -574,10 +581,10 @@ function YouTubeSheetMusicFinder() {
   });
 
   const handleFind = () => {
-    const url = ytUrl.trim();
+    const url = inputUrl.trim();
     if (!url) return;
     setResult(null);
-    findMutation.mutate({ youtubeUrl: url });
+    findMutation.mutate({ url });
   };
 
   const handleImport = async (src: FinderResult["sources"][0]) => {
@@ -603,7 +610,7 @@ function YouTubeSheetMusicFinder() {
       <div className="flex items-center gap-3 mb-6">
         <span className="text-[oklch(0.78_0.12_85)]">♪</span>
         <div className="flex-1 h-px bg-gradient-to-r from-[oklch(0.78_0.12_85/0.4)] to-transparent" />
-        <p className="font-mono text-[0.6rem] text-[oklch(0.78_0.12_85)] uppercase tracking-[0.25em]">Find Sheet Music from YouTube</p>
+        <p className="font-mono text-[0.6rem] text-[oklch(0.78_0.12_85)] uppercase tracking-[0.25em]">Find Sheet Music from YouTube or Spotify</p>
         <div className="flex-1 h-px bg-gradient-to-l from-[oklch(0.78_0.12_85/0.4)] to-transparent" />
         <span className="text-[oklch(0.78_0.12_85)]">♪</span>
       </div>
@@ -615,28 +622,30 @@ function YouTubeSheetMusicFinder() {
           onDrop={(e) => {
             e.preventDefault();
             const text = e.dataTransfer.getData("text/plain") || e.dataTransfer.getData("text/uri-list");
-            if (text) setYtUrl(text.trim());
+            if (text) setInputUrl(text.trim());
           }}
           onDragOver={(e) => e.preventDefault()}
         >
-          <Youtube size={14} className="shrink-0 text-[oklch(0.68_0.20_25)]" />
+          {isSpotify
+            ? <span className="shrink-0 text-[oklch(0.65_0.20_145)] text-xs font-bold">♫</span>
+            : <Youtube size={14} className="shrink-0 text-[oklch(0.68_0.20_25)]" />}
           <input
             type="url"
-            value={ytUrl}
-            onChange={(e) => setYtUrl(e.target.value)}
+            value={inputUrl}
+            onChange={(e) => setInputUrl(e.target.value)}
             onKeyDown={(e) => e.key === "Enter" && handleFind()}
-            placeholder="Paste or drag a YouTube URL (e.g. https://youtu.be/...)"
+            placeholder="Paste a YouTube or Spotify URL (e.g. https://open.spotify.com/track/...)"
             className="flex-1 bg-transparent text-sm text-[oklch(0.88_0.01_85)] placeholder:text-[oklch(0.38_0.012_265)] outline-none min-w-0"
           />
-          {ytUrl && (
-            <button onClick={() => { setYtUrl(""); setResult(null); }} className="shrink-0 text-[oklch(0.40_0.012_265)] hover:text-[oklch(0.65_0.015_265)] transition-colors">
+          {inputUrl && (
+            <button onClick={() => { setInputUrl(""); setResult(null); }} className="shrink-0 text-[oklch(0.40_0.012_265)] hover:text-[oklch(0.65_0.015_265)] transition-colors">
               <X size={13} />
             </button>
           )}
         </div>
         <button
           onClick={handleFind}
-          disabled={!ytUrl.trim() || isSearching}
+          disabled={!inputUrl.trim() || isSearching}
           className="shrink-0 flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-[oklch(0.78_0.12_85)] text-[oklch(0.12_0.018_265)] text-sm font-semibold disabled:opacity-40 disabled:cursor-not-allowed hover:bg-[oklch(0.85_0.12_85)] active:scale-[0.97] transition-all duration-150"
         >
           {isSearching ? <Loader2 size={14} className="animate-spin" /> : <Sparkles size={14} />}
@@ -644,7 +653,7 @@ function YouTubeSheetMusicFinder() {
         </button>
       </div>
       <p className="text-xs text-[oklch(0.38_0.012_265)] text-center mb-4">
-        Paste any YouTube video URL — the portal will identify the piece and search Scribd, YouTube, IMSLP &amp; MuseScore
+        Paste a YouTube or Spotify URL — the portal identifies the piece and searches Scribd, IMSLP &amp; MuseScore
       </p>
 
       {/* Progress steps while searching */}
@@ -655,7 +664,7 @@ function YouTubeSheetMusicFinder() {
             {[
               { label: "Identifying the composition", icon: Music },
               { label: "Searching your Scribd subscription", icon: Search },
-              { label: "Scanning YouTube description & comments", icon: Youtube },
+              { label: isSpotify ? "Fetching Spotify track info" : "Scanning YouTube description & comments", icon: isSpotify ? Music : Youtube },
               { label: "Checking IMSLP & MuseScore", icon: Globe },
             ].map(({ label, icon: Icon }, i) => (
               <div key={i} className="flex items-center gap-3">
@@ -682,14 +691,20 @@ function YouTubeSheetMusicFinder() {
               <p className="font-['Playfair_Display'] font-semibold text-[oklch(0.92_0.01_85)] truncate">{result.compositionName}</p>
               <p className="text-sm text-[oklch(0.65_0.015_265)]">{result.composer}</p>
             </div>
-            <a
-              href={`https://www.youtube.com/watch?v=${result.videoId}`}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="ml-auto shrink-0 flex items-center gap-1 text-xs text-[oklch(0.68_0.20_25)] hover:text-[oklch(0.78_0.20_25)] transition-colors"
-            >
-              <Youtube size={12} /> View
-            </a>
+            {result.videoId ? (
+              <a
+                href={`https://www.youtube.com/watch?v=${result.videoId}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="ml-auto shrink-0 flex items-center gap-1 text-xs text-[oklch(0.68_0.20_25)] hover:text-[oklch(0.78_0.20_25)] transition-colors"
+              >
+                <Youtube size={12} /> View
+              </a>
+            ) : result.videoTitle && (
+              <span className="ml-auto shrink-0 text-xs text-[oklch(0.65_0.20_145)] flex items-center gap-1">
+                <span className="text-[0.65rem]">♫</span> Spotify
+              </span>
+            )}
           </div>
 
           {result.sources.length === 0 ? (

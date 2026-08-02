@@ -74,3 +74,18 @@
 - [x] Frontend: Run Now button on /auto-import page with progress feedback
 - [x] ScoreViewer: graceful fallback for non-PDF/non-image mimeTypes (shows friendly message + download link)
 - [x] DB cleanup: removed junk HTML/Spotify/YouTube compositions (3 rows deleted, 15 real piano scores remain)
+
+## Auto-Import Piano Folder Fix + Spotify Support
+- [x] Auto-Import: changed scan path to ~/Desktop/Piano - New Music to Learn/ only (removed Downloads)
+- [x] Auto-Import: removed keyword filter — all PDFs in the Piano folder are imported
+- [x] Auto-Import: updated AGENT cron detail to scan Piano folder
+- [x] Auto-Import: updated UI text to reference Piano folder
+- [x] Imported Le Rêve D'une Note and Wyden Down from Piano folder into library
+- [x] Spotify link support: isSpotifyUrl() detection in sheetMusicFinder.ts
+- [x] Spotify link support: getSpotifyMetadata() via free oEmbed API (no API key needed)
+- [x] Spotify link support: identifyCompositionFromSpotify() AI identification
+- [x] Spotify link support: findSheetMusicFromSpotify() main entry point (Scribd + IMSLP + MuseScore)
+- [x] Backend: findSheetMusic procedure now accepts { url } (YouTube or Spotify)
+- [x] Frontend: finder input accepts both YouTube and Spotify URLs, icon changes dynamically
+- [x] Frontend: progress steps adapt for Spotify (no YouTube description step)
+- [x] Frontend: result banner shows Spotify badge when source is Spotify

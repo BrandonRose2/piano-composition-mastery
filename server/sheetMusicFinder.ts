@@ -1,10 +1,10 @@
 /**
  * Sheet Music Finder Pipeline
- * Given a YouTube URL:
- *  1. Extract video metadata (title, description, channel)
+ * Given a YouTube URL OR Spotify track/album/playlist URL:
+ *  1. Extract track/video metadata (title, artist/channel)
  *  2. Use AI to identify the composition name + composer
  *  3. Search Scribd (authenticated with session cookie)
- *  4. Scan YouTube description + top comments for PDF links
+ *  4. Scan YouTube description + top comments for PDF links (YouTube only)
  *  5. Fallback: search IMSLP and MuseScore
  * Returns a ranked list of PDF sources.
  */
@@ -35,6 +35,73 @@ export interface FinderResult {
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
+
+/** Detect if a URL is a Spotify share link */
+export function isSpotifyUrl(url: string): boolean {
+  return /open\.spotify\.com\/(track|album|playlist|artist)\//i.test(url) ||
+    /spotify\.link\//i.test(url);
+}
+
+/** Extract Spotify track/album metadata via the free oEmbed API (no API key needed) */
+async function getSpotifyMetadata(spotifyUrl: string): Promise<{
+  title: string;
+  thumbnailUrl?: string;
+} | null> {
+  try {
+    const oembedUrl = `https://open.spotify.com/oembed?url=${encodeURIComponent(spotifyUrl)}`;
+    const res = await fetch(oembedUrl, {
+      headers: { "User-Agent": "PianoMasteryPortal/1.0" },
+      signal: AbortSignal.timeout(8_000),
+    });
+    if (!res.ok) return null;
+    const data = await res.json() as { title?: string; thumbnail_url?: string };
+    return {
+      title: data.title ?? "",
+      thumbnailUrl: data.thumbnail_url,
+    };
+  } catch (err) {
+    console.error("[SheetFinder] Spotify oEmbed error:", err);
+    return null;
+  }
+}
+
+/** Use AI to extract composition name + composer from a Spotify track title */
+async function identifyCompositionFromSpotify(
+  trackTitle: string
+): Promise<{ compositionName: string; composer: string }> {
+  const prompt = `You are a classical music expert. Given the following Spotify track title, identify the piano composition and its composer.
+
+SPOTIFY TRACK TITLE: "${trackTitle}"
+
+Extract:
+1. The exact composition name (e.g. "Nocturne in E-flat major, Op. 9 No. 2")
+2. The composer's full name (e.g. "Frédéric Chopin")
+
+If this is a modern/pop piece, use the track title as the composition name and the artist as composer.
+
+Respond ONLY with a JSON object: {"compositionName": "...", "composer": "..."}`;
+
+  try {
+    const response = await invokeLLM({
+      model: "claude-haiku-4-5",
+      messages: [{ role: "user", content: prompt }],
+      max_tokens: 200,
+    });
+    const raw = response.choices[0]?.message?.content;
+    const text = typeof raw === "string" ? raw
+      : Array.isArray(raw) ? (raw as any[]).filter(b => b.type === "text").map(b => b.text).join("") : "";
+    const cleaned = text.replace(/```(?:json)?\s*/gi, "").replace(/```/g, "").trim();
+    const first = cleaned.indexOf("{");
+    const last = cleaned.lastIndexOf("}");
+    const parsed = JSON.parse(cleaned.slice(first, last + 1));
+    return {
+      compositionName: parsed.compositionName ?? trackTitle,
+      composer: parsed.composer ?? "Unknown",
+    };
+  } catch {
+    return { compositionName: trackTitle, composer: "Unknown" };
+  }
+}
 
 /** Extract YouTube video ID from any YouTube URL format */
 export function extractVideoId(url: string): string | null {
@@ -377,6 +444,69 @@ export async function findSheetMusicFromYouTube(
   return {
     videoId,
     videoTitle,
+    compositionName,
+    composer,
+    sources: allSources,
+  };
+}
+
+// ── Spotify Entry Point ───────────────────────────────────────────────────────
+
+/**
+ * Find sheet music for a Spotify track/album link.
+ * Uses oEmbed (no API key) to get the title, then runs the same
+ * Scribd + IMSLP + MuseScore search pipeline.
+ */
+export async function findSheetMusicFromSpotify(
+  spotifyUrl: string,
+  scribdSessionCookie: string
+): Promise<FinderResult> {
+  console.log(`[SheetFinder] Spotify search for: ${spotifyUrl}`);
+
+  // Step 1: Get track title via oEmbed
+  const meta = await getSpotifyMetadata(spotifyUrl);
+  const trackTitle = meta?.title ?? "";
+  if (!trackTitle) {
+    return {
+      videoId: "",
+      videoTitle: spotifyUrl,
+      compositionName: "",
+      composer: "",
+      sources: [],
+      error: "Could not retrieve track info from Spotify. Make sure the link is a valid public Spotify track, album, or playlist URL.",
+    };
+  }
+
+  console.log(`[SheetFinder] Spotify track: "${trackTitle}"`);
+
+  // Step 2: Identify composition + composer via AI
+  const { compositionName, composer } = await identifyCompositionFromSpotify(trackTitle);
+  console.log(`[SheetFinder] Identified: "${compositionName}" by ${composer}`);
+
+  // Step 3–5: Run searches in parallel (no YouTube description/comments for Spotify)
+  const [scribdResults, imslpResults, musescoreResults] = await Promise.all([
+    searchScribd(compositionName, composer, scribdSessionCookie),
+    searchImslp(compositionName, composer),
+    searchMusescore(compositionName, composer),
+  ]);
+
+  // Merge and deduplicate
+  const seen = new Set<string>();
+  const allSources: SheetMusicResult[] = [
+    ...scribdResults,
+    ...imslpResults,
+    ...musescoreResults,
+  ].filter(r => {
+    if (seen.has(r.url)) return false;
+    seen.add(r.url);
+    return true;
+  });
+
+  console.log(`[SheetFinder] Spotify search found ${allSources.length} sources`);
+
+  return {
+    videoId: "",          // not a YouTube video
+    videoTitle: trackTitle,
     compositionName,
     composer,
     sources: allSources,
