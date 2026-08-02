@@ -712,81 +712,79 @@ export const appRouter = router({
     list: protectedProcedure.query(async () => {
       return listImportedFiles(100);
     }),
-    /** Immediately scan the desktop Downloads folder and import new PDFs */
-    runNow: protectedProcedure.mutation(async ({ ctx }) => {
-      const userId = ctx.user.id;
-      // Scan the dedicated Piano sheet music folder — mounted from OneDrive Personal
-      // The folder is: ~/Library/CloudStorage/OneDrive-Personal/Piano - New Music to Learn
-      // which is mounted at /mnt/desktop/Piano - New Music to Learn by the Manus desktop connector
-      const pianoFolder = "/mnt/desktop/Piano - New Music to Learn";
-      let files: string[] = [];
-      try {
-        const entries = fs.readdirSync(pianoFolder);
-        files = entries
-          .filter(f => f.toLowerCase().endsWith(".pdf"))
-          .map(f => path.join(pianoFolder, f));
-      } catch {
-        throw new Error(
-          "Could not access the 'Piano - New Music to Learn' folder. " +
-          "Make sure your Mac is connected and the OneDrive Personal folder 'Piano - New Music to Learn' is accessible."
-        );
-      }
 
-      // Get already-imported filenames to skip duplicates
-      const alreadyImportedArr = await getImportedFilenames();
-      const alreadyImported = new Set(alreadyImportedArr);
+    /**
+     * Upload a single PDF from the browser for batch import.
+     * The frontend reads files locally and sends them as base64.
+     * Returns the composition id so the UI can track per-file status.
+     */
+    uploadFile: protectedProcedure
+      .input(z.object({
+        fileName: z.string(),
+        base64Data: z.string(),
+        fileSize: z.number(),
+      }))
+      .mutation(async ({ input, ctx }) => {
+        const userId = ctx.user.id;
+        const MAX_SIZE = 20 * 1024 * 1024; // 20MB
 
-      // Since this is the dedicated Piano folder, import ALL PDFs not yet imported
-      const newFiles = files.filter(f => !alreadyImported.has(path.basename(f)));
+        if (input.fileSize > MAX_SIZE) {
+          await recordImportedFile({ filename: input.fileName, filePath: "", compositionId: null, status: "skipped", errorMessage: "File too large (max 20MB)" });
+          return { status: "skipped", reason: "File too large (max 20MB)", compositionId: null };
+        }
 
-      const MAX_SIZE = 20 * 1024 * 1024; // 20MB
-      const results: { filename: string; status: string }[] = [];
-
-      for (const filePath of newFiles) {
-        const filename = path.basename(filePath);
-        try {
-          const stat = fs.statSync(filePath);
-          if (stat.size > MAX_SIZE) {
-            results.push({ filename, status: "skipped_too_large" });
-            continue;
+        // Check for duplicate by filename scoped to this user's compositions
+        const db = await getDb();
+        if (db) {
+          const { compositions: compsTable } = await import("../drizzle/schema");
+          const { eq, and } = await import("drizzle-orm");
+          const existing = await db
+            .select({ id: compsTable.id })
+            .from(compsTable)
+            .where(and(eq(compsTable.userId, userId), eq(compsTable.fileName, input.fileName)))
+            .limit(1);
+          if (existing.length > 0) {
+            await recordImportedFile({ filename: input.fileName, filePath: "", compositionId: existing[0].id, status: "skipped", errorMessage: "Already in library" });
+            return { status: "skipped", reason: "Already in library", compositionId: existing[0].id };
           }
-          const buffer = fs.readFileSync(filePath);
-          const fileKey = `auto-import/${Date.now()}-${filename}`;
+        }
+
+        try {
+          const buffer = Buffer.from(input.base64Data, "base64");
+          const fileKey = `auto-import/${userId}/${Date.now()}-${input.fileName.replace(/[^a-zA-Z0-9._-]/g, "_")}`;
           const { url: fileUrl } = await storagePut(fileKey, buffer, "application/pdf");
-          const titleFromFilename = filename
+
+          const titleFromFilename = input.fileName
             .replace(/^\d+-/, "")
             .replace(/\.[^.]+$/, "")
             .replace(/[-_]/g, " ")
             .replace(/\s+\(\d+\)$/, "")
             .trim();
+
           const comp = await createComposition({
             userId,
             title: titleFromFilename,
             fileKey,
             fileUrl,
-            fileName: filename,
+            fileName: input.fileName,
             mimeType: "application/pdf",
           });
-          await recordImportedFile({ filename, filePath, compositionId: comp.id, status: "imported" });
-          // Kick off analysis in background (don't await)
-          analyzeComposition(filename, buffer, "application/pdf")
+
+          await recordImportedFile({ filename: input.fileName, filePath: fileKey, compositionId: comp.id, status: "imported" });
+
+          // Set to analyzing, then kick off AI analysis in background
+          await updateCompositionStatus(comp.id, "analyzing");
+          analyzeComposition(input.fileName, buffer, "application/pdf")
             .then(result => updateCompositionStatus(comp.id, "complete", { analysis: result?.analysis, framework: result?.framework }))
             .catch(err => updateCompositionStatus(comp.id, "error", { errorMessage: err.message }));
-          results.push({ filename, status: "imported" });
-        } catch (err) {
-          results.push({ filename, status: `error: ${err instanceof Error ? err.message : String(err)}` });
-        }
-      }
 
-      return {
-        scanned: files.length,
-        newPianoFiles: newFiles.length,
-        results,
-        imported: results.filter(r => r.status === "imported").length,
-        skipped: results.filter(r => r.status.startsWith("skipped")).length,
-        errors: results.filter(r => r.status.startsWith("error")).length,
-      };
-    }),
+          return { status: "imported", reason: "", compositionId: comp.id };
+        } catch (err) {
+          const msg = err instanceof Error ? err.message : String(err);
+          await recordImportedFile({ filename: input.fileName, filePath: "", compositionId: null, status: "error", errorMessage: msg });
+          throw new Error(msg);
+        }
+      }),
   }),
 });
 export type AppRouter = typeof appRouter;

@@ -89,3 +89,9 @@
 - [x] Frontend: finder input accepts both YouTube and Spotify URLs, icon changes dynamically
 - [x] Frontend: progress steps adapt for Spotify (no YouTube description step)
 - [x] Frontend: result banner shows Spotify badge when source is Spotify
+
+## Auto-Import Browser Upload (replaces server-side filesystem scan)
+- [x] Auto-Import: replace Run Now server scan with browser-based multi-PDF drag-and-drop uploader
+- [x] Auto-Import: wire browser file upload to S3 + AI analysis pipeline (same as main upload zone)
+- [x] Auto-Import: show per-file status icons during batch upload (spinner → checkmark/skip/error)
+- [x] Auto-Import: keep Import History table and stats intact

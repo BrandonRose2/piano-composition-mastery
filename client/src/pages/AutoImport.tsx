@@ -1,8 +1,11 @@
-import { useState } from "react";
+import { useState, useCallback, useRef } from "react";
 import { trpc } from "@/lib/trpc";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { getLoginUrl } from "@/const";
-import { CheckCircle, XCircle, SkipForward, Clock, FolderOpen, RefreshCw, Calendar, Play } from "lucide-react";
+import {
+  CheckCircle, XCircle, SkipForward, Clock, FolderOpen,
+  RefreshCw, Calendar, Upload, FileText, X
+} from "lucide-react";
 
 type ImportStatus = "imported" | "skipped" | "error";
 
@@ -28,18 +31,100 @@ function StatusBadge({ status }: { status: ImportStatus }) {
   );
 }
 
+type FileEntry = {
+  file: File;
+  status: "pending" | "uploading" | "imported" | "skipped" | "error";
+  reason?: string;
+  compositionId?: number | null;
+};
+
 export default function AutoImport() {
   const { user, loading: authLoading } = useAuth();
   const { data: history, isLoading, refetch } = trpc.autoImport.list.useQuery(undefined, {
     enabled: !!user,
   });
-  const [runResult, setRunResult] = useState<null | { imported: number; skipped: number; errors: number; scanned: number; newPianoFiles: number; results: { filename: string; status: string }[] }>(null);
-  const runNow = trpc.autoImport.runNow.useMutation({
-    onSuccess: (data) => {
-      setRunResult(data);
-      refetch();
-    },
-  });
+
+  const [files, setFiles] = useState<FileEntry[]>([]);
+  const [isDragging, setIsDragging] = useState(false);
+  const [isRunning, setIsRunning] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const uploadFile = trpc.autoImport.uploadFile.useMutation();
+
+  const addFiles = useCallback((newFiles: File[]) => {
+    const pdfs = newFiles.filter(f => f.name.toLowerCase().endsWith(".pdf"));
+    setFiles(prev => {
+      const existingNames = new Set(prev.map(e => e.file.name));
+      const toAdd = pdfs
+        .filter(f => !existingNames.has(f.name))
+        .map(f => ({ file: f, status: "pending" as const }));
+      return [...prev, ...toAdd];
+    });
+  }, []);
+
+  const handleDrop = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragging(false);
+    const dropped = Array.from(e.dataTransfer.files);
+    addFiles(dropped);
+  }, [addFiles]);
+
+  const handleFileInput = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files) {
+      addFiles(Array.from(e.target.files));
+      e.target.value = "";
+    }
+  }, [addFiles]);
+
+  const removeFile = (name: string) => {
+    setFiles(prev => prev.filter(f => f.file.name !== name));
+  };
+
+  const runImport = async () => {
+    const pending = files.filter(f => f.status === "pending");
+    if (pending.length === 0) return;
+    setIsRunning(true);
+
+    for (const entry of pending) {
+      // Mark as uploading
+      setFiles(prev => prev.map(f =>
+        f.file.name === entry.file.name ? { ...f, status: "uploading" } : f
+      ));
+
+      try {
+        const base64Data = await new Promise<string>((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = () => {
+            const result = reader.result as string;
+            // Strip the data URL prefix (e.g. "data:application/pdf;base64,")
+            resolve(result.split(",")[1] ?? "");
+          };
+          reader.onerror = reject;
+          reader.readAsDataURL(entry.file);
+        });
+
+        const result = await uploadFile.mutateAsync({
+          fileName: entry.file.name,
+          base64Data,
+          fileSize: entry.file.size,
+        });
+
+        setFiles(prev => prev.map(f =>
+          f.file.name === entry.file.name
+            ? { ...f, status: result.status as "imported" | "skipped", reason: result.reason, compositionId: result.compositionId }
+            : f
+        ));
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        setFiles(prev => prev.map(f =>
+          f.file.name === entry.file.name ? { ...f, status: "error", reason: msg } : f
+        ));
+      }
+    }
+
+    setIsRunning(false);
+    refetch();
+  };
 
   if (authLoading) {
     return (
@@ -67,6 +152,9 @@ export default function AutoImport() {
   const errors = history?.filter(f => f.status === "error").length ?? 0;
   const lastRun = history && history.length > 0 ? new Date(history[0].importedAt) : null;
 
+  const pendingCount = files.filter(f => f.status === "pending").length;
+  const doneCount = files.filter(f => f.status === "imported" || f.status === "skipped" || f.status === "error").length;
+
   return (
     <div className="min-h-screen bg-[#0a0a0a] text-[#e8d5a3]">
       {/* Header */}
@@ -86,60 +174,120 @@ export default function AutoImport() {
 
       <div className="max-w-4xl mx-auto px-6 py-8 space-y-8">
 
-        {/* Run Now button */}
-        <div className="bg-[#111] border border-[#c9a84c]/30 rounded-xl p-6">
-          <div className="flex items-center justify-between gap-4">
-            <div>
-              <h2 className="text-[#e8d5a3] font-semibold">Run Import Now</h2>
-              <p className="text-[#8a7a5a] text-sm mt-1">
-                Immediately scan your <strong className="text-[#c9a84c]">Piano - New Music to Learn</strong> folder on your OneDrive Personal and import any new PDFs into your library.
-              </p>
-            </div>
-            <button
-              onClick={() => { setRunResult(null); runNow.mutate(); }}
-              disabled={runNow.isPending}
-              className="flex items-center gap-2 px-5 py-2.5 bg-[#c9a84c] text-black font-semibold rounded-lg hover:bg-[#b8973b] disabled:opacity-50 disabled:cursor-not-allowed transition-all active:scale-95 flex-shrink-0"
-            >
-              {runNow.isPending ? (
-                <><div className="w-4 h-4 border-2 border-black border-t-transparent rounded-full animate-spin" /> Scanning...</>
-              ) : (
-                <><Play className="w-4 h-4" /> Run Now</>
-              )}
-            </button>
+        {/* Drag-and-drop upload zone */}
+        <div className="bg-[#111] border border-[#c9a84c]/30 rounded-xl p-6 space-y-4">
+          <div>
+            <h2 className="text-[#e8d5a3] font-semibold">Batch Import PDFs</h2>
+            <p className="text-[#8a7a5a] text-sm mt-1">
+              Drag your <strong className="text-[#c9a84c]">Piano - New Music to Learn</strong> PDFs from your OneDrive folder directly into the box below, or click to browse. Then hit <strong className="text-[#c9a84c]">Import All</strong>.
+            </p>
           </div>
 
-          {/* Run result */}
-          {runNow.isError && (
-            <div className="mt-4 p-3 bg-red-900/20 border border-red-800/40 rounded-lg text-red-400 text-sm">
-              {runNow.error.message}
-            </div>
-          )}
-          {runResult && (
-            <div className="mt-4 space-y-3">
-              <div className="flex flex-wrap gap-3 text-sm">
-                <span className="px-3 py-1 bg-[#1a1a1a] rounded-full text-[#8a7a5a]">Scanned {runResult.scanned} PDFs</span>
-                <span className="px-3 py-1 bg-[#1a1a1a] rounded-full text-[#8a7a5a]">{runResult.newPianoFiles} new piano files found</span>
-                <span className="px-3 py-1 bg-green-900/30 rounded-full text-green-400">{runResult.imported} imported</span>
-                {runResult.skipped > 0 && <span className="px-3 py-1 bg-yellow-900/30 rounded-full text-yellow-400">{runResult.skipped} skipped</span>}
-                {runResult.errors > 0 && <span className="px-3 py-1 bg-red-900/30 rounded-full text-red-400">{runResult.errors} errors</span>}
+          {/* Drop zone */}
+          <div
+            onDragOver={e => { e.preventDefault(); setIsDragging(true); }}
+            onDragLeave={() => setIsDragging(false)}
+            onDrop={handleDrop}
+            onClick={() => fileInputRef.current?.click()}
+            className={`
+              relative border-2 border-dashed rounded-xl p-10 text-center cursor-pointer transition-all
+              ${isDragging
+                ? "border-[#c9a84c] bg-[#c9a84c]/5"
+                : "border-[#3a3a3a] hover:border-[#c9a84c]/50 hover:bg-[#c9a84c]/3"
+              }
+            `}
+          >
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept=".pdf"
+              multiple
+              className="hidden"
+              onChange={handleFileInput}
+            />
+            <Upload className={`w-10 h-10 mx-auto mb-3 ${isDragging ? "text-[#c9a84c]" : "text-[#3a3a3a]"}`} />
+            <p className={`font-medium ${isDragging ? "text-[#c9a84c]" : "text-[#8a7a5a]"}`}>
+              {isDragging ? "Drop PDFs here" : "Drag & drop PDFs here, or click to browse"}
+            </p>
+            <p className="text-[#6a5a3a] text-xs mt-1">Select multiple files at once • PDF only • Max 20MB each</p>
+          </div>
+
+          {/* File list */}
+          {files.length > 0 && (
+            <div className="space-y-2">
+              <div className="flex items-center justify-between text-xs text-[#8a7a5a]">
+                <span>{files.length} file{files.length !== 1 ? "s" : ""} selected</span>
+                {!isRunning && doneCount === 0 && (
+                  <button onClick={() => setFiles([])} className="text-[#6a5a3a] hover:text-red-400 transition-colors">
+                    Clear all
+                  </button>
+                )}
               </div>
-              {runResult.results.length > 0 && (
-                <div className="bg-[#0d0d0d] rounded-lg divide-y divide-[#1a1a1a] max-h-48 overflow-y-auto">
-                  {runResult.results.map((r, i) => (
-                    <div key={i} className="px-4 py-2 flex items-center justify-between gap-3 text-xs">
-                      <span className="text-[#8a7a5a] truncate">{r.filename}</span>
-                      <span className={r.status === "imported" ? "text-green-400 flex-shrink-0" : r.status.startsWith("skipped") ? "text-yellow-400 flex-shrink-0" : "text-red-400 flex-shrink-0"}>
-                        {r.status}
-                      </span>
-                    </div>
-                  ))}
+              <div className="bg-[#0d0d0d] rounded-lg divide-y divide-[#1a1a1a] max-h-64 overflow-y-auto">
+                {files.map(entry => (
+                  <div key={entry.file.name} className="px-4 py-2.5 flex items-center gap-3">
+                    <FileText className="w-4 h-4 text-[#c9a84c]/60 flex-shrink-0" />
+                    <span className="flex-1 text-xs text-[#e8d5a3] truncate">{entry.file.name}</span>
+                    <span className="text-xs text-[#6a5a3a] flex-shrink-0">
+                      {(entry.file.size / 1024).toFixed(0)} KB
+                    </span>
+                    {entry.status === "pending" && !isRunning && (
+                      <button
+                        onClick={e => { e.stopPropagation(); removeFile(entry.file.name); }}
+                        className="text-[#6a5a3a] hover:text-red-400 transition-colors flex-shrink-0"
+                      >
+                        <X className="w-3.5 h-3.5" />
+                      </button>
+                    )}
+                    {entry.status === "uploading" && (
+                      <div className="w-3.5 h-3.5 border-2 border-[#c9a84c] border-t-transparent rounded-full animate-spin flex-shrink-0" />
+                    )}
+                    {entry.status === "imported" && <CheckCircle className="w-3.5 h-3.5 text-green-400 flex-shrink-0" />}
+                    {entry.status === "skipped" && (
+                      <span className="text-xs text-yellow-400 flex-shrink-0">{entry.reason ?? "Skipped"}</span>
+                    )}
+                    {entry.status === "error" && (
+                      <span className="text-xs text-red-400 flex-shrink-0 max-w-32 truncate" title={entry.reason}>Error</span>
+                    )}
+                  </div>
+                ))}
+              </div>
+
+              {/* Import button */}
+              {pendingCount > 0 && (
+                <button
+                  onClick={runImport}
+                  disabled={isRunning}
+                  className="w-full flex items-center justify-center gap-2 px-5 py-3 bg-[#c9a84c] text-black font-semibold rounded-lg hover:bg-[#b8973b] disabled:opacity-50 disabled:cursor-not-allowed transition-all active:scale-[0.98]"
+                >
+                  {isRunning ? (
+                    <><div className="w-4 h-4 border-2 border-black border-t-transparent rounded-full animate-spin" /> Importing...</>
+                  ) : (
+                    <><Upload className="w-4 h-4" /> Import {pendingCount} PDF{pendingCount !== 1 ? "s" : ""}</>
+                  )}
+                </button>
+              )}
+
+              {/* Summary after import */}
+              {!isRunning && doneCount > 0 && pendingCount === 0 && (
+                <div className="flex flex-wrap gap-3 text-sm pt-1">
+                  {files.filter(f => f.status === "imported").length > 0 && (
+                    <span className="px-3 py-1 bg-green-900/30 rounded-full text-green-400">
+                      ✓ {files.filter(f => f.status === "imported").length} imported
+                    </span>
+                  )}
+                  {files.filter(f => f.status === "skipped").length > 0 && (
+                    <span className="px-3 py-1 bg-yellow-900/30 rounded-full text-yellow-400">
+                      {files.filter(f => f.status === "skipped").length} skipped (already in library)
+                    </span>
+                  )}
+                  {files.filter(f => f.status === "error").length > 0 && (
+                    <span className="px-3 py-1 bg-red-900/30 rounded-full text-red-400">
+                      {files.filter(f => f.status === "error").length} errors
+                    </span>
+                  )}
+                  <span className="text-[#8a7a5a] text-xs self-center">AI analysis running in background</span>
                 </div>
-              )}
-              {runResult.imported > 0 && (
-                <p className="text-[#c9a84c] text-sm">✓ {runResult.imported} new piece{runResult.imported !== 1 ? "s" : ""} added to your library — AI analysis is running in the background.</p>
-              )}
-              {runResult.imported === 0 && runResult.newPianoFiles === 0 && (
-                <p className="text-[#8a7a5a] text-sm">No new piano PDFs found — your library is up to date!</p>
               )}
             </div>
           )}
@@ -206,7 +354,7 @@ export default function AutoImport() {
               <FolderOpen className="w-12 h-12 text-[#3a3a3a] mb-4" />
               <p className="text-[#8a7a5a] font-medium">No imports yet</p>
               <p className="text-[#6a5a3a] text-sm mt-1">
-                The weekly agent will run every Sunday and automatically import new PDFs from your 'Piano - New Music to Learn' folder on your OneDrive Personal.
+                Drag your PDFs into the upload zone above to get started.
               </p>
             </div>
           ) : (
@@ -249,11 +397,11 @@ export default function AutoImport() {
           <h2 className="text-[#e8d5a3] font-semibold mb-4">How It Works</h2>
           <ol className="space-y-3">
             {[
-              "Every Sunday at 9 AM UTC, a Manus agent wakes up and scans your 'Piano - New Music to Learn' folder on your OneDrive Personal",
-              "It finds all PDF files not previously imported (tracked by filename in the database)",
-              "Each new PDF is uploaded to your portal's secure storage and added to your library",
+              "Open your OneDrive 'Piano - New Music to Learn' folder in Finder",
+              "Select all your piano PDFs (Cmd+A) and drag them into the upload zone above",
+              "Click 'Import All' — each PDF is uploaded to your portal's secure storage",
               "The AI immediately analyzes each piece and generates a 30-day practice framework",
-              "Tip: drop any new Scribd PDFs into your OneDrive 'Piano - New Music to Learn' folder and they'll be picked up automatically!",
+              "Duplicates are automatically skipped — safe to drag the whole folder every time",
             ].map((step, i) => (
               <li key={i} className="flex items-start gap-3 text-sm text-[#8a7a5a]">
                 <span className="w-5 h-5 rounded-full bg-[#c9a84c]/10 border border-[#c9a84c]/30 text-[#c9a84c] text-xs flex items-center justify-center flex-shrink-0 mt-0.5">
@@ -264,6 +412,7 @@ export default function AutoImport() {
             ))}
           </ol>
         </div>
+
       </div>
     </div>
   );
