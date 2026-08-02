@@ -241,56 +241,83 @@ Your task:
 Respond ONLY with a valid JSON object — no markdown, no code fences, no explanation — matching this exact schema:
 ${JSON_SCHEMA}`;
 
-  console.log(`[Analysis] Calling LLM for: ${fileNameHint}`);
+  const MAX_ATTEMPTS = 3;
+  let lastError: Error = new Error("Analysis failed after all retries.");
 
-  const response = await invokeLLM({
-    model: "claude-haiku-4-5",
-    messages: [
-      { role: "system", content: systemPrompt },
-      { role: "user", content: userPrompt },
-    ],
-    max_tokens: 8000,
-  });
+  for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+    if (attempt > 1) {
+      const delayMs = attempt === 2 ? 3000 : 6000; // 3s then 6s backoff
+      console.log(`[Analysis] Retry attempt ${attempt}/${MAX_ATTEMPTS} for: ${fileNameHint} (waiting ${delayMs}ms)`);
+      await new Promise(resolve => setTimeout(resolve, delayMs));
+    } else {
+      console.log(`[Analysis] Calling LLM for: ${fileNameHint}`);
+    }
 
-  const rawContent = response.choices[0]?.message?.content;
-  const content = typeof rawContent === "string" ? rawContent
-    : Array.isArray(rawContent)
-      ? (rawContent as Array<{type:string;text?:string}>)
-          .filter(b => b.type === "text")
-          .map(b => b.text ?? "")
-          .join("")
-      : undefined;
+    try {
+      const response = await invokeLLM({
+        model: "claude-haiku-4-5",
+        messages: [
+          { role: "system", content: systemPrompt },
+          { role: "user", content: userPrompt },
+        ],
+        max_tokens: 8000,
+      });
 
-  if (!content || content.trim().length === 0) {
-    throw new Error("AI returned an empty response. Please try again.");
+      const rawContent = response.choices[0]?.message?.content;
+      const content = typeof rawContent === "string" ? rawContent
+        : Array.isArray(rawContent)
+          ? (rawContent as Array<{type:string;text?:string}>)
+              .filter(b => b.type === "text")
+              .map(b => b.text ?? "")
+              .join("")
+          : undefined;
+
+      if (!content || content.trim().length === 0) {
+        lastError = new Error("AI returned an empty response.");
+        console.warn(`[Analysis] Empty response on attempt ${attempt}/${MAX_ATTEMPTS}`);
+        continue;
+      }
+
+      // Strip markdown code fences if present, then extract the JSON object
+      // Claude sometimes prefixes with a thinking sentence before the JSON block.
+      let cleaned = content
+        .replace(/^```(?:json)?\s*/i, "")
+        .replace(/\s*```\s*$/i, "")
+        .trim();
+
+      // Find the outermost JSON object by locating the first '{' and last '}'
+      const firstBrace = cleaned.indexOf("{");
+      const lastBrace = cleaned.lastIndexOf("}");
+      if (firstBrace !== -1 && lastBrace > firstBrace) {
+        cleaned = cleaned.slice(firstBrace, lastBrace + 1);
+      }
+
+      let parsed: { analysis: CompositionAnalysis; framework: CompositionFramework };
+      try {
+        parsed = JSON.parse(cleaned);
+      } catch (parseErr) {
+        lastError = new Error(`AI response was not valid JSON: ${parseErr instanceof Error ? parseErr.message : parseErr}`);
+        console.warn(`[Analysis] JSON parse failed on attempt ${attempt}/${MAX_ATTEMPTS}. Raw (first 300):`, cleaned.slice(0, 300));
+        continue; // retry
+      }
+
+      if (!parsed.analysis || !parsed.framework) {
+        lastError = new Error("AI response was missing required 'analysis' or 'framework' fields.");
+        console.warn(`[Analysis] Missing fields on attempt ${attempt}/${MAX_ATTEMPTS}`);
+        continue; // retry
+      }
+
+      console.log(`[Analysis] Complete (attempt ${attempt}): "${parsed.analysis.title}" by ${parsed.analysis.composer}`);
+      return { analysis: parsed.analysis, framework: parsed.framework };
+
+    } catch (err) {
+      // Network or LLM API error — retry
+      lastError = err instanceof Error ? err : new Error(String(err));
+      console.warn(`[Analysis] LLM call failed on attempt ${attempt}/${MAX_ATTEMPTS}:`, lastError.message);
+    }
   }
 
-  // Strip markdown code fences if present, then extract the JSON object
-  // Claude sometimes prefixes with a thinking sentence before the JSON block.
-  let cleaned = content
-    .replace(/^```(?:json)?\s*/i, "")
-    .replace(/\s*```\s*$/i, "")
-    .trim();
-
-  // Find the outermost JSON object by locating the first '{' and last '}'
-  const firstBrace = cleaned.indexOf("{");
-  const lastBrace = cleaned.lastIndexOf("}");
-  if (firstBrace !== -1 && lastBrace > firstBrace) {
-    cleaned = cleaned.slice(firstBrace, lastBrace + 1);
-  }
-
-  let parsed: { analysis: CompositionAnalysis; framework: CompositionFramework };
-  try {
-    parsed = JSON.parse(cleaned);
-  } catch (parseErr) {
-    console.error("[Analysis] JSON parse failed. Raw content (first 500):", cleaned.slice(0, 500));
-    throw new Error(`AI response was not valid JSON: ${parseErr instanceof Error ? parseErr.message : parseErr}`);
-  }
-
-  if (!parsed.analysis || !parsed.framework) {
-    throw new Error("AI response was missing required 'analysis' or 'framework' fields.");
-  }
-
-  console.log(`[Analysis] Complete: "${parsed.analysis.title}" by ${parsed.analysis.composer}`);
-  return { analysis: parsed.analysis, framework: parsed.framework };
+  // All attempts exhausted
+  console.error(`[Analysis] All ${MAX_ATTEMPTS} attempts failed for: ${fileNameHint}. Last error:`, lastError.message);
+  throw lastError;
 }

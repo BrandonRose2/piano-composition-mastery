@@ -1359,7 +1359,7 @@ export default function Home() {
   }, [uploadMutation, utils]);
 
   const handleUpload = useCallback(async (file: File) => {
-    const MAX_SIZE = 15 * 1024 * 1024; // 15MB
+    const MAX_SIZE = 50 * 1024 * 1024; // 50MB
 
     // ── ZIP batch import ──────────────────────────────────────────────────
     const isZip = file.type === 'application/zip' ||
@@ -1402,7 +1402,7 @@ export default function Home() {
             const arrayBuffer = await entry.async('arraybuffer');
             if (arrayBuffer.byteLength > MAX_SIZE) {
               setZipBatch(prev => prev.map((item, idx) =>
-                idx === i ? { ...item, status: 'error', error: 'File too large (>15MB)' } : item
+                idx === i ? { ...item, status: 'error', error: 'File too large (>50MB)' } : item
               ));
               errorCount++;
               continue;
@@ -1436,7 +1436,7 @@ export default function Home() {
 
     // ── Single file upload ────────────────────────────────────────────────
     if (file.size > MAX_SIZE) {
-      toast.error("File is too large. Please upload a file under 15MB.");
+      toast.error("File is too large. Please upload a file under 50MB.");
       return;
     }
 

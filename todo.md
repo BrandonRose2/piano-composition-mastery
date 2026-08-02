@@ -135,3 +135,7 @@
 - [x] Frontend: show per-file status during ZIP extraction and upload (filename, spinner/check/skip/error)
 - [x] Backend: no changes needed — reuse existing compositions.upload mutation per PDF
 - [x] Frontend: show summary after ZIP import (X imported, Y skipped duplicates, Z errors)
+
+## Bug Fixes (from screen recording 2026-08-02)
+- [x] Raise per-file upload limit from 15MB to 50MB (frontend ZIP handler + single upload + backend)
+- [x] Add automatic retry with exponential backoff for AI JSON parse errors (up to 3 retries)

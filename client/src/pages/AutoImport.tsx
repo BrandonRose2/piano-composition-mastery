@@ -256,7 +256,7 @@ export default function AutoImport() {
             <p className={`font-medium ${isDragging ? "text-[#c9a84c]" : "text-[#8a7a5a]"}`}>
               {isDragging ? "Drop PDFs here" : "Drag & drop PDFs here, or click to browse"}
             </p>
-            <p className="text-[#6a5a3a] text-xs mt-1">Select multiple files at once • PDF only • Max 20MB each</p>
+            <p className="text-[#6a5a3a] text-xs mt-1">Select multiple files at once • PDF only • Max 50MB each</p>
           </div>
 
           {/* File list */}

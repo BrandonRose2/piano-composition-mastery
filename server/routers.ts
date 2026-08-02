@@ -769,11 +769,11 @@ export const appRouter = router({
       }))
       .mutation(async ({ input, ctx }) => {
         const userId = ctx.user.id;
-        const MAX_SIZE = 20 * 1024 * 1024; // 20MB
+        const MAX_SIZE = 50 * 1024 * 1024; // 50MB
 
         if (input.fileSize > MAX_SIZE) {
-          await recordImportedFile({ filename: input.fileName, filePath: "", compositionId: null, status: "skipped", errorMessage: "File too large (max 20MB)" });
-          return { status: "skipped", reason: "File too large (max 20MB)", compositionId: null };
+          await recordImportedFile({ filename: input.fileName, filePath: "", compositionId: null, status: "skipped", errorMessage: "File too large (max 50MB)" });
+          return { status: "skipped", reason: "File too large (max 50MB)", compositionId: null };
         }
 
         // Check for duplicate by filename scoped to this user's compositions
