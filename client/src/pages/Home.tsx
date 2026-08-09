@@ -1299,8 +1299,30 @@ export default function Home() {
   const [zipBatchDone, setZipBatchDone] = useState(false);
   const utils = trpc.useUtils();
 
+  const [retryingAll, setRetryingAll] = useState(false);
+  const retryAllMutation = trpc.compositions.retryAnalysis.useMutation();
+
   const { data: compositions = [], isLoading } = trpc.compositions.list.useQuery();
   const { data: progressSummaries = [] } = trpc.progress.summaryAll.useQuery();
+
+  const errorCompositions = compositions.filter((c: any) => c.status === "error");
+
+  const handleRetryAll = useCallback(async () => {
+    if (errorCompositions.length === 0 || retryingAll) return;
+    setRetryingAll(true);
+    let successCount = 0;
+    for (const comp of errorCompositions) {
+      try {
+        await retryAllMutation.mutateAsync({ id: comp.id });
+        successCount++;
+      } catch {
+        // individual failures are fine — keep going
+      }
+    }
+    utils.compositions.list.invalidate();
+    toast.success(`Re-running analysis on ${successCount} composition${successCount !== 1 ? "s" : ""}…`);
+    setRetryingAll(false);
+  }, [errorCompositions, retryingAll, retryAllMutation, utils]);
 
   // Build a lookup map: compositionId → { completedDays, percentage }
   const progressMap = Object.fromEntries(
@@ -1629,6 +1651,23 @@ export default function Home() {
             <div className="flex-1 h-px bg-gradient-to-l from-[oklch(0.78_0.12_85/0.4)] to-transparent" />
             <span className="text-[oklch(0.78_0.12_85)]">♪</span>
           </div>
+
+          {/* Retry All Errors button — only shown when there are error compositions */}
+          {errorCompositions.length > 0 && (
+            <div className="mb-4 flex items-center justify-between nocturne-card px-4 py-3">
+              <p className="text-xs text-[oklch(0.72_0.015_265)]">
+                <span className="text-red-400 font-semibold">{errorCompositions.length}</span> composition{errorCompositions.length !== 1 ? "s" : ""} failed analysis
+              </p>
+              <button
+                onClick={handleRetryAll}
+                disabled={retryingAll}
+                className="flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-lg bg-[oklch(0.78_0.12_85/0.15)] border border-[oklch(0.78_0.12_85/0.4)] text-[oklch(0.78_0.12_85)] hover:bg-[oklch(0.78_0.12_85/0.25)] active:scale-[0.97] disabled:opacity-50 transition-all duration-150"
+              >
+                {retryingAll ? <Loader2 size={11} className="animate-spin" /> : <ArrowRight size={11} />}
+                {retryingAll ? "Retrying all…" : `Retry All ${errorCompositions.length} Errors`}
+              </button>
+            </div>
+          )}
 
           <div className="grid gap-3">
             {/* Built-in La Campanella */}
