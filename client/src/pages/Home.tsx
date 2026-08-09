@@ -9,6 +9,7 @@ import { useLocation } from "wouter";
 import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
 import { Music, Upload, BookOpen, ChevronRight, Loader2, AlertCircle, CheckCircle2, Clock, Trash2, Youtube, ExternalLink, LogOut, User, Search, FileText, X, Download, Import, Link, Sparkles, ArrowRight, Check, Globe, FolderOpen, Archive, Library } from "lucide-react";
+import { ComposerFolderLibrary } from "@/components/ComposerFolderLibrary";
 import { useAuth } from "@/_core/hooks/useAuth";
 import JSZip from "jszip";
 
@@ -1669,32 +1670,15 @@ export default function Home() {
             </div>
           )}
 
-          <div className="grid gap-3">
-            {/* Built-in La Campanella */}
-            <LaCampanellaCard />
-
-            {/* Uploaded compositions */}
-            {isLoading ? (
-              <div className="nocturne-card p-8 text-center">
-                <Loader2 size={24} className="text-[oklch(0.78_0.12_85)] animate-spin mx-auto mb-3" />
-                <p className="text-sm text-[oklch(0.72_0.015_265)]">Loading your library…</p>
-              </div>
-            ) : compositions.length === 0 ? (
-              <div className="nocturne-card p-8 text-center border-dashed">
-                <BookOpen size={28} className="text-[oklch(0.35_0.010_265)] mx-auto mb-3" />
-                <p className="text-sm text-[oklch(0.68_0.012_265)]">No uploaded compositions yet.</p>
-                <p className="text-xs text-[oklch(0.35_0.010_265)] mt-1">Upload a score above to get started.</p>
-              </div>
-            ) : (
-              compositions.map((comp) => (
-                <CompositionCard
-                  key={comp.id}
-                  composition={comp}
-                  progressSummary={progressMap[comp.id] ?? null}
-                />
-              ))
+          <ComposerFolderLibrary
+            compositions={compositions}
+            progressMap={progressMap}
+            isLoading={isLoading}
+            renderFeatured={() => <LaCampanellaCard />}
+            renderCard={(comp, ps) => (
+              <CompositionCard composition={comp} progressSummary={ps} />
             )}
-          </div>
+          />
         </div>
 
       </main>
