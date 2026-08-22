@@ -89,6 +89,21 @@ export async function getUserByOpenId(openId: string) {
   return result.length > 0 ? result[0] : undefined;
 }
 
+/**
+ * Resolve the canonical library owner for an authenticated identity. This keeps
+ * intentionally linked OAuth/email accounts on one private composition library.
+ */
+export async function resolveLibraryOwnerId(userId: number): Promise<number> {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  const rows = await db
+    .select({ id: users.id, libraryOwnerId: users.libraryOwnerId })
+    .from(users)
+    .where(eq(users.id, userId))
+    .limit(1);
+  return rows[0]?.libraryOwnerId ?? rows[0]?.id ?? userId;
+}
+
 // ── Composition helpers (userId-scoped) ───────────────────────────────────────
 
 export async function createComposition(data: InsertComposition) {

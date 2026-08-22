@@ -16,6 +16,7 @@ import {
   upsertScribdSavedDocs,
   listScribdSavedDocs,
   searchScribdSavedDocs,
+  resolveLibraryOwnerId,
 } from "./db";
 import { storagePut } from "./storage";
 import { analyzeComposition } from "./analyzeComposition";
@@ -44,14 +45,14 @@ export const appRouter = router({
   compositions: router({
     /** List only the current user's compositions */
     list: protectedProcedure.query(async ({ ctx }) => {
-      return listCompositions(ctx.user.id);
+      return listCompositions(await resolveLibraryOwnerId(ctx.user.id));
     }),
 
     /** Get a single composition — only if it belongs to the current user */
     get: protectedProcedure
       .input(z.object({ id: z.number() }))
       .query(async ({ input, ctx }) => {
-        return getCompositionById(input.id, ctx.user.id);
+        return getCompositionById(input.id, await resolveLibraryOwnerId(ctx.user.id));
       }),
 
     /** Upload a new composition score and kick off AI analysis */
@@ -65,7 +66,7 @@ export const appRouter = router({
         })
       )
       .mutation(async ({ input, ctx }) => {
-        const userId = ctx.user.id;
+        const userId = await resolveLibraryOwnerId(ctx.user.id);
         const buffer = Buffer.from(input.base64Data, "base64");
         const key = `compositions/${userId}/${Date.now()}-${input.fileName.replace(/[^a-zA-Z0-9._-]/g, "_")}`;
         const { url: fileUrl } = await storagePut(key, buffer, input.mimeType);
@@ -114,7 +115,7 @@ export const appRouter = router({
     status: protectedProcedure
       .input(z.object({ id: z.number() }))
       .query(async ({ input, ctx }) => {
-        const comp = await getCompositionById(input.id, ctx.user.id);
+        const comp = await getCompositionById(input.id, await resolveLibraryOwnerId(ctx.user.id));
         if (!comp) throw new Error("Composition not found");
         return { status: comp.status, errorMessage: comp.errorMessage };
       }),
@@ -123,6 +124,7 @@ export const appRouter = router({
     rename: protectedProcedure
       .input(z.object({ id: z.number(), title: z.string().min(1).max(200) }))
       .mutation(async ({ input, ctx }) => {
+        const userId = await resolveLibraryOwnerId(ctx.user.id);
         const db = await (await import("./db")).getDb();
         if (!db) throw new Error("Database unavailable");
         const { compositions } = await import("../drizzle/schema");
@@ -130,7 +132,7 @@ export const appRouter = router({
         await db
           .update(compositions)
           .set({ title: input.title })
-          .where(and(eq(compositions.id, input.id), eq(compositions.userId, ctx.user.id)));
+          .where(and(eq(compositions.id, input.id), eq(compositions.userId, userId)));
         return { success: true };
       }),
 
@@ -138,7 +140,7 @@ export const appRouter = router({
     delete: protectedProcedure
       .input(z.object({ id: z.number() }))
       .mutation(async ({ input, ctx }) => {
-        await deleteComposition(input.id, ctx.user.id);
+        await deleteComposition(input.id, await resolveLibraryOwnerId(ctx.user.id));
         return { success: true };
       }),
 
@@ -149,7 +151,7 @@ export const appRouter = router({
     retryAnalysis: protectedProcedure
       .input(z.object({ id: z.number() }))
       .mutation(async ({ input, ctx }) => {
-        const comp = await getCompositionById(input.id, ctx.user.id);
+        const comp = await getCompositionById(input.id, await resolveLibraryOwnerId(ctx.user.id));
         if (!comp) throw new Error("Composition not found or access denied");
         if (!comp.fileKey) throw new Error("No file stored for this composition — please re-upload.");
         if (comp.status === "analyzing") throw new Error("Analysis is already in progress.");
@@ -309,7 +311,7 @@ export const appRouter = router({
         })
       )
       .mutation(async ({ input, ctx }) => {
-        const userId = ctx.user.id;
+        const userId = await resolveLibraryOwnerId(ctx.user.id);
 
         // Fetch the PDF from the provided URL
         const response = await fetch(input.pdfUrl, {
@@ -523,7 +525,7 @@ export const appRouter = router({
         const composer = result.composer ?? "";
         const searchQuery = `${composer} ${compositionName}`.trim();
         if (searchQuery.length > 3) {
-          const savedMatches = await searchScribdSavedDocs(searchQuery, ctx.user.id);
+          const savedMatches = await searchScribdSavedDocs(searchQuery, await resolveLibraryOwnerId(ctx.user.id));
           if (savedMatches.length > 0) {
             const savedResults = savedMatches.map(doc => ({
               source: "scribd_saved" as const,
@@ -562,7 +564,7 @@ export const appRouter = router({
       isScribd: z.boolean().optional().default(false),
     }))
     .mutation(async ({ input, ctx }) => {
-      const userId = ctx.user.id;
+      const userId = await resolveLibraryOwnerId(ctx.user.id);
       const headers: Record<string, string> = {
         "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
         "Accept": "application/pdf,*/*",
@@ -634,7 +636,7 @@ export const appRouter = router({
       })
     )
     .mutation(async ({ input, ctx }) => {
-      const userId = ctx.user.id;
+      const userId = await resolveLibraryOwnerId(ctx.user.id);
 
       // Fetch the page
       const response = await fetch(input.url, {
@@ -698,6 +700,7 @@ export const appRouter = router({
   progress: router({
     /** Summarise progress for ALL of the current user's compositions in one call */
     summaryAll: protectedProcedure.query(async ({ ctx }) => {
+      const userId = await resolveLibraryOwnerId(ctx.user.id);
       const db = await (await import("./db")).getDb();
       if (!db) return [];
       const { practiceProgress } = await import("../drizzle/schema");
@@ -705,7 +708,7 @@ export const appRouter = router({
       const rows = await db
         .select()
         .from(practiceProgress)
-        .where(eq(practiceProgress.userId, ctx.user.id));
+        .where(eq(practiceProgress.userId, userId));
       // Group by compositionId and count completed days
       const map: Record<number, { completed: number; total: number }> = {};
       for (const row of rows) {
@@ -725,7 +728,7 @@ export const appRouter = router({
     get: protectedProcedure
       .input(z.object({ compositionId: z.number() }))
       .query(async ({ input, ctx }) => {
-        return getProgressForComposition(input.compositionId, ctx.user.id);
+        return getProgressForComposition(input.compositionId, await resolveLibraryOwnerId(ctx.user.id));
       }),
 
     /** Toggle a day's completion status */
@@ -739,11 +742,12 @@ export const appRouter = router({
         })
       )
       .mutation(async ({ input, ctx }) => {
+        const userId = await resolveLibraryOwnerId(ctx.user.id);
         await toggleDayProgress(
           input.compositionId,
           input.dayNumber,
           input.completed,
-          ctx.user.id,
+          userId,
           input.notes
         );
         return { success: true };
@@ -767,7 +771,7 @@ export const appRouter = router({
         fileSize: z.number(),
       }))
       .mutation(async ({ input, ctx }) => {
-        const userId = ctx.user.id;
+        const userId = await resolveLibraryOwnerId(ctx.user.id);
         const MAX_SIZE = 50 * 1024 * 1024; // 50MB
 
         if (input.fileSize > MAX_SIZE) {
@@ -839,6 +843,7 @@ export const appRouter = router({
     syncFromHtml: protectedProcedure
       .input(z.object({ html: z.string().min(10) }))
       .mutation(async ({ input, ctx }) => {
+        const userId = await resolveLibraryOwnerId(ctx.user.id);
         const { html } = input;
         const docs: { userId: number; docId: string; title: string; url: string; slug: string }[] = [];
         const seen = new Set<string>();
@@ -854,7 +859,7 @@ export const appRouter = router({
           // Convert slug to title: "my-sheet-music" → "My Sheet Music"
           const title = slug.replace(/-/g, " ").replace(/\b\w/g, c => c.toUpperCase());
           docs.push({
-            userId: ctx.user.id,
+            userId,
             docId,
             title,
             url: `https://www.scribd.com/document/${docId}/${slug}`,
@@ -877,6 +882,7 @@ export const appRouter = router({
     addByUrl: protectedProcedure
       .input(z.object({ url: z.string().url() }))
       .mutation(async ({ input, ctx }) => {
+        const userId = await resolveLibraryOwnerId(ctx.user.id);
         // Match https://www.scribd.com/document/123/slug or /doc/123/slug
         const match = input.url.match(/scribd\.com\/(document|doc)\/(\d+)\/([^?#\s]+)/);
         if (!match) {
@@ -886,7 +892,7 @@ export const appRouter = router({
         const slug = match[3];
         const title = slug.replace(/-/g, " ").replace(/\b\w/g, c => c.toUpperCase());
         await upsertScribdSavedDocs([{
-          userId: ctx.user.id,
+          userId,
           docId,
           title,
           url: `https://www.scribd.com/document/${docId}/${slug}`,
@@ -898,14 +904,14 @@ export const appRouter = router({
     /** Return all cached saved docs for the current user, newest first */
     getSavedDocs: protectedProcedure
       .query(async ({ ctx }) => {
-        return listScribdSavedDocs(ctx.user.id);
+        return listScribdSavedDocs(await resolveLibraryOwnerId(ctx.user.id));
       }),
 
     /** Fuzzy-search cached saved docs by composition/composer name */
     searchSaved: protectedProcedure
       .input(z.object({ query: z.string() }))
       .query(async ({ input, ctx }) => {
-        return searchScribdSavedDocs(input.query, ctx.user.id);
+        return searchScribdSavedDocs(input.query, await resolveLibraryOwnerId(ctx.user.id));
       }),
   }),
 });

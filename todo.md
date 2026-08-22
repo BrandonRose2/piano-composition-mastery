@@ -156,3 +156,13 @@
 - [x] Make the metronome more visible and accessible on desktop and mobile
 - [x] Verify the metronome starts, stops, changes tempo, and remains usable in split-screen practice
 - [x] Expand the user-guide PDF into a full feature-by-feature walkthrough, including the metronome, score viewer, print, split-screen, library organization, import, finder, Scribd, analysis, and recovery flows
+
+## Library Visibility Recovery
+- [x] Verify every composition record and its user ownership in the database
+- [x] Trace the compositions.list query and composer-folder rendering for any filtering or display regression
+- [x] Restore the complete composition library view without deleting or recreating user data
+- [x] Add a persistent library-owner link for the user’s email and Google login identities
+- [x] Resolve the linked library owner for every composition, progress, upload, and Scribd procedure
+- [x] Verify both login identities show the same 29-score library and practice progress
+- [x] Add regression coverage confirming linked identities resolve the same practice-progress records
+- [x] Confirm the linked-library behavior through the available authenticated Comet portal session

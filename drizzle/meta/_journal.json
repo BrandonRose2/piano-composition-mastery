@@ -43,6 +43,13 @@
       "when": 1785638766650,
       "tag": "0005_strong_night_nurse",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "5",
+      "when": 1787412093252,
+      "tag": "0006_happy_deathbird",
+      "breakpoints": true
     }
   ]
 }
