@@ -139,3 +139,7 @@
 ## Bug Fixes (from screen recording 2026-08-02)
 - [x] Raise per-file upload limit from 15MB to 50MB (frontend ZIP handler + single upload + backend)
 - [x] Add automatic retry with exponential backoff for AI JSON parse errors (up to 3 retries)
+
+## Updated User Guide
+- [x] Create refreshed PDF guide covering current library, composer folders, import, finder, practice, and recovery workflows
+- [x] Redesign the user-guide PDF with the portal’s dark velvet-and-gold styling and rename it to Piano Composition Mastery Portal
