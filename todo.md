@@ -179,3 +179,6 @@
 - [x] Prevent duplicate composition imports using content fingerprints and normalized source-filename checks within the shared library
 - [x] Make My Scribd Library collapsed by default with an expandable search-and-browse panel
 - [ ] Recheck the authenticated Comet session and verify the metronome interactively
+
+## Composer Folder Defaults
+- [x] Load every composer folder in Your Library collapsed by default while retaining per-folder expand/collapse controls

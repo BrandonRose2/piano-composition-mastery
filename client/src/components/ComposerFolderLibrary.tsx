@@ -30,10 +30,10 @@ export function ComposerFolderLibrary({ compositions, progressMap, isLoading, re
   }, [compositions]);
 
   const toggleFolder = (composer: string) => {
-    setOpenFolders(prev => ({ ...prev, [composer]: !(prev[composer] ?? true) }));
+    setOpenFolders(prev => ({ ...prev, [composer]: !(prev[composer] ?? false) }));
   };
 
-  const isFolderOpen = (composer: string) => openFolders[composer] ?? true;
+  const isFolderOpen = (composer: string) => openFolders[composer] ?? false;
 
   if (isLoading) {
     return (
@@ -64,6 +64,7 @@ export function ComposerFolderLibrary({ compositions, progressMap, isLoading, re
               {/* Folder header row */}
               <button
                 onClick={() => toggleFolder(composer)}
+                aria-expanded={open}
                 className="w-full flex items-center gap-3 px-4 py-3 bg-[oklch(0.15_0.012_265)] hover:bg-[oklch(0.17_0.014_265)] transition-colors duration-150"
               >
                 <div
