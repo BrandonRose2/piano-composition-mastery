@@ -116,6 +116,37 @@ export async function createComposition(data: InsertComposition) {
   return rows[0];
 }
 
+function normalizeCompositionFilename(value: string | null | undefined): string {
+  return (value ?? "")
+    .replace(/\.[^.]+$/, "")
+    .replace(/^\d{5,}[\s._-]*/, "")
+    .toLocaleLowerCase()
+    .replace(/[^a-z0-9]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+/**
+ * Treats scores as duplicates only when their bytes match exactly or their
+ * normalized original filenames match. Similar titles are intentionally kept,
+ * so different arrangements are never silently removed.
+ */
+export async function findDuplicateComposition(
+  userId: number,
+  input: { fileName?: string | null; contentHash?: string | null }
+) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  const candidates = await db.select().from(compositions).where(eq(compositions.userId, userId));
+  const normalizedIncomingName = normalizeCompositionFilename(input.fileName);
+
+  return candidates.find((candidate) => {
+    if (input.contentHash && candidate.contentHash === input.contentHash) return true;
+    return Boolean(normalizedIncomingName) &&
+      normalizeCompositionFilename(candidate.fileName) === normalizedIncomingName;
+  }) ?? null;
+}
+
 export async function getCompositionById(id: number, userId?: number) {
   const db = await getDb();
   if (!db) throw new Error("Database not available");

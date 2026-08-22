@@ -166,3 +166,16 @@
 - [x] Verify both login identities show the same 29-score library and practice progress
 - [x] Add regression coverage confirming linked identities resolve the same practice-progress records
 - [x] Confirm the linked-library behavior through the available authenticated Comet portal session
+
+## Final Metronome, Finder, and Guide Pass
+- [x] Verify and improve the metronome’s primary entry point, start/stop audio, tempo controls, and mobile visibility
+- [x] Confirm every Find Any Piece workflow puts saved Scribd and Scribd catalog results first, free sources next, and MuseScore last
+- [x] Re-deliver the comprehensive Piano Composition Mastery Portal user guide PDF
+- [ ] Verify the metronome end-to-end in the authenticated portal, including mobile visibility and split-screen behavior
+- [x] Make MuseScore the true final finder bucket, with no result sources displayed after it
+
+## Library Duplicates and Scribd Library Layout
+- [x] Identify and safely remove duplicate composition records without deleting distinct arrangements or source files
+- [x] Prevent duplicate composition imports using content fingerprints and normalized source-filename checks within the shared library
+- [x] Make My Scribd Library collapsed by default with an expandable search-and-browse panel
+- [ ] Recheck the authenticated Comet session and verify the metronome interactively

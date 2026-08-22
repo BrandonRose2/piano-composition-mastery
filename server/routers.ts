@@ -17,6 +17,7 @@ import {
   listScribdSavedDocs,
   searchScribdSavedDocs,
   resolveLibraryOwnerId,
+  findDuplicateComposition,
 } from "./db";
 import { storagePut } from "./storage";
 import { analyzeComposition } from "./analyzeComposition";
@@ -28,6 +29,7 @@ import { getImportedFilenames, recordImportedFile } from "./db";
 import * as fs from "fs";
 import * as path from "path";
 import * as bcrypt from "bcryptjs";
+import { createHash } from "crypto";
 import { users } from "../drizzle/schema";
 import { eq } from "drizzle-orm";
 
@@ -68,6 +70,9 @@ export const appRouter = router({
       .mutation(async ({ input, ctx }) => {
         const userId = await resolveLibraryOwnerId(ctx.user.id);
         const buffer = Buffer.from(input.base64Data, "base64");
+        const contentHash = createHash("sha256").update(buffer).digest("hex");
+        const existing = await findDuplicateComposition(userId, { fileName: input.fileName, contentHash });
+        if (existing) return { ...existing, duplicate: true };
         const key = `compositions/${userId}/${Date.now()}-${input.fileName.replace(/[^a-zA-Z0-9._-]/g, "_")}`;
         const { url: fileUrl } = await storagePut(key, buffer, input.mimeType);
 
@@ -77,6 +82,7 @@ export const appRouter = router({
           fileName: input.fileName,
           fileKey: key,
           fileUrl,
+          contentHash,
           mimeType: input.mimeType,
           status: "pending",
         });
@@ -343,6 +349,9 @@ export const appRouter = router({
         const rawName = decodeURIComponent(urlPath.split("/").pop() ?? "score.pdf");
         const fileName = rawName.endsWith(".pdf") ? rawName : `${rawName}.pdf`;
         const title = input.titleHint || fileName.replace(/\.pdf$/i, "").replace(/[-_]/g, " ");
+        const contentHash = createHash("sha256").update(buffer).digest("hex");
+        const existing = await findDuplicateComposition(userId, { fileName, contentHash });
+        if (existing) return { id: existing.id, title: existing.title, duplicate: true };
 
         const key = `compositions/${userId}/${Date.now()}-${fileName.replace(/[^a-zA-Z0-9._-]/g, "_")}`;
         const { url: fileUrl } = await storagePut(key, buffer, "application/pdf");
@@ -353,6 +362,7 @@ export const appRouter = router({
           fileName,
           fileKey: key,
           fileUrl,
+          contentHash,
           mimeType: "application/pdf",
           status: "pending",
         });
@@ -601,11 +611,14 @@ export const appRouter = router({
       const rawName = decodeURIComponent(urlPath.split("/").pop() ?? "score.pdf");
       const fileName = rawName.endsWith(".pdf") ? rawName : `${rawName}.pdf`;
       const title = input.titleHint || fileName.replace(/\.pdf$/i, "").replace(/[-_]/g, " ");
+      const contentHash = createHash("sha256").update(buffer).digest("hex");
+      const existing = await findDuplicateComposition(userId, { fileName, contentHash });
+      if (existing) return { id: existing.id, title: existing.title, duplicate: true };
 
       const key = `compositions/${userId}/${Date.now()}-${fileName.replace(/[^a-zA-Z0-9._-]/g, "_")}`;
       const { url: fileUrl } = await storagePut(key, buffer, "application/pdf");
 
-      const composition = await createComposition({ userId, title, fileName, fileKey: key, fileUrl, mimeType: "application/pdf", status: "pending" });
+      const composition = await createComposition({ userId, title, fileName, fileKey: key, fileUrl, contentHash, mimeType: "application/pdf", status: "pending" });
       if (!composition) throw new Error("Failed to create composition record");
 
       const compositionId = composition.id;
@@ -662,6 +675,9 @@ export const appRouter = router({
 
       // Store the raw HTML as a file in S3 so the composition record has a fileUrl
       const buffer = Buffer.from(rawText, "utf-8");
+      const contentHash = createHash("sha256").update(buffer).digest("hex");
+      const existing = await findDuplicateComposition(userId, { fileName, contentHash });
+      if (existing) return { id: existing.id, title: existing.title, duplicate: true };
       const key = `compositions/${userId}/${Date.now()}-${fileName.replace(/[^a-zA-Z0-9._-]/g, "_")}`;
       const { url: fileUrl } = await storagePut(key, buffer, "text/html");
 
@@ -671,6 +687,7 @@ export const appRouter = router({
         fileName,
         fileKey: key,
         fileUrl,
+        contentHash,
         mimeType: "text/html",
         status: "pending",
       });
@@ -797,6 +814,12 @@ export const appRouter = router({
 
         try {
           const buffer = Buffer.from(input.base64Data, "base64");
+          const contentHash = createHash("sha256").update(buffer).digest("hex");
+          const existingByContent = await findDuplicateComposition(userId, { fileName: input.fileName, contentHash });
+          if (existingByContent) {
+            await recordImportedFile({ filename: input.fileName, filePath: "", compositionId: existingByContent.id, status: "skipped", errorMessage: "Already in library" });
+            return { status: "skipped", reason: "Already in library", compositionId: existingByContent.id };
+          }
           const fileKey = `auto-import/${userId}/${Date.now()}-${input.fileName.replace(/[^a-zA-Z0-9._-]/g, "_")}`;
           const { url: fileUrl } = await storagePut(fileKey, buffer, "application/pdf");
 
@@ -813,6 +836,7 @@ export const appRouter = router({
             fileKey,
             fileUrl,
             fileName: input.fileName,
+            contentHash,
             mimeType: "application/pdf",
           });
 

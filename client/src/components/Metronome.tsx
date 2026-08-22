@@ -29,6 +29,7 @@ export default function Metronome() {
   const [currentBeat, setCurrentBeat] = useState(0);
   const [tapTimes, setTapTimes] = useState<number[]>([]);
   const [audioError, setAudioError] = useState<string | null>(null);
+  const [statusMessage, setStatusMessage] = useState("Ready — use Test Sound, then Start.");
 
   const audioCtxRef = useRef<AudioContext | null>(null);
   const nextNoteTimeRef = useRef(0);
@@ -101,6 +102,7 @@ export default function Metronome() {
       nextNoteTimeRef.current = audioCtxRef.current.currentTime + 0.05;
       isPlayingRef.current = true;
       setIsPlaying(true);
+      setStatusMessage(`Running at ${bpmRef.current} BPM in ${timeSigRef.current}/4.`);
       scheduler();
     } catch {
       setAudioError("Sound could not start. Check that this browser tab is not muted, then try again.");
@@ -112,6 +114,7 @@ export default function Metronome() {
     isPlayingRef.current = false;
     setIsPlaying(false);
     setCurrentBeat(0);
+    setStatusMessage("Stopped — adjust tempo or press Start when ready.");
   }, []);
 
   const toggle = useCallback(async () => {
@@ -167,6 +170,20 @@ export default function Metronome() {
     currentBeatRef.current = 0;
     setTimeout(restartIfPlaying, 0);
   };
+
+  const testSound = useCallback(async () => {
+    try {
+      const AudioContextClass = window.AudioContext || (window as typeof window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+      if (!AudioContextClass) throw new Error("Unsupported");
+      if (!audioCtxRef.current) audioCtxRef.current = new AudioContextClass();
+      if (audioCtxRef.current.state === "suspended") await audioCtxRef.current.resume();
+      scheduleNote(0, audioCtxRef.current.currentTime + 0.01);
+      setAudioError(null);
+      setStatusMessage("Test click played. If you heard it, press Start to begin the pulse.");
+    } catch {
+      setAudioError("Sound could not play. Check the browser tab and device are not muted, then try again.");
+    }
+  }, [scheduleNote]);
 
   const tempoMark = getTempoMark(bpm);
 
@@ -232,8 +249,11 @@ export default function Metronome() {
 
       {/* Controls */}
       <div className="metro-controls">
-        <button className="metro-tap-btn" onClick={handleTap}>
+        <button className="metro-tap-btn" onClick={handleTap} aria-label="Tap tempo">
           Tap Tempo
+        </button>
+        <button className="metro-tap-btn" onClick={testSound} aria-label="Play a test metronome click">
+          Test Sound
         </button>
         <button
           className={`metro-play-btn ${isPlaying ? "metro-playing" : ""}`}
@@ -267,6 +287,7 @@ export default function Metronome() {
           </button>
         ))}
       </div>
+      <p className="mt-3 text-center text-[0.7rem] leading-snug text-[oklch(0.66_0.014_265)]" role="status">{statusMessage}</p>
       {audioError && <p className="mt-3 text-center text-[0.7rem] text-amber-300/80 leading-snug">{audioError}</p>}
     </div>
   );

@@ -5,7 +5,7 @@
  *  2. Use AI to identify the composition name + composer
  *  3. Search Scribd catalog first (including the user's subscription session)
  *  4. Search free public sources: IMSLP and direct public links (YouTube only)
- *  5. Offer MuseScore only after the preceding sources
+ *  5. Offer MuseScore only as the final fallback after all preferred sources
  * Returns an intentionally ordered list of score sources.
  */
 
@@ -43,11 +43,12 @@ const SOURCE_PRIORITY: Record<SheetMusicResult["source"], number> = {
   free_scores: 23,
   youtube_description: 30,
   youtube_comments: 31,
+  // Subscription-only sources share the one final fallback bucket.
   musescore: 40,
-  web: 90,
+  web: 40,
 };
 
-/** Sort sources into the exact portal policy: Scribd → free sources → MuseScore → last resort. */
+/** Sort sources into the exact portal policy: Scribd → free sources → one final subscription fallback bucket. */
 export function orderSourcesByPriority(sources: SheetMusicResult[]): SheetMusicResult[] {
   return [...sources].sort((a, b) => SOURCE_PRIORITY[a.source] - SOURCE_PRIORITY[b.source]);
 }
@@ -66,8 +67,7 @@ function searchOrderFor(hasYouTubeLinks: boolean): string[] {
     "1. Scribd catalog and your saved Scribd library",
     "2. Free public score databases (IMSLP, Mutopia, Musopen, and Free-scores)",
     ...(hasYouTubeLinks ? ["3. Direct public score links from the YouTube description and comments"] : []),
-    `${hasYouTubeLinks ? "4" : "3"}. MuseScore after the free-source search`,
-    `${hasYouTubeLinks ? "5" : "4"}. Other subscription sites only when explicitly added as a last resort`,
+    `${hasYouTubeLinks ? "4" : "3"}. MuseScore and other subscription sites only as the final fallback`,
   ];
 }
 
@@ -346,7 +346,7 @@ async function runPrioritizedSourceSearch(
   ]);
   const freeCatalogResults = searchFreeCatalogs(compositionName, composer);
 
-  // MuseScore is intentionally evaluated only after the preceding free sources.
+  // MuseScore is intentionally evaluated only as the final fallback, after Scribd and every free source.
   const musescoreResults = await searchMusescore(compositionName, composer);
 
   return {
@@ -379,7 +379,7 @@ async function scanYouTubeLinks(
     const isMusescore = link.includes("musescore.com");
     if (isPdf || isImslp || isMusescore) {
       results.push({
-        source: "youtube_description",
+          source: isMusescore ? "musescore" : "youtube_description",
         title: isImslp ? "IMSLP Score (from video description)"
           : isMusescore ? "MuseScore (from video description)"
           : "PDF Score (from video description)",
@@ -409,7 +409,7 @@ async function scanYouTubeLinks(
         const isMusescore = link.includes("musescore.com");
         if (isPdf || isImslp || isMusescore) {
           results.push({
-            source: "youtube_comments",
+            source: isMusescore ? "musescore" : "youtube_comments",
             title: isImslp ? "IMSLP Score (from comment)"
               : isMusescore ? "MuseScore (from comment)"
               : "PDF Score (from comment)",
@@ -529,7 +529,7 @@ async function searchMusescore(
       previewUrl: url,
       canImportDirectly: false,
       confidence: "low",
-      notes: "Click to browse MuseScore for free scores (manual download)",
+      notes: "Last-resort source. Open only after Scribd and the free score databases do not provide a suitable score.",
     });
   } catch {
     // ignore

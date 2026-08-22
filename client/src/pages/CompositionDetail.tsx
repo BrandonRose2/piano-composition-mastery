@@ -919,13 +919,13 @@ export default function CompositionDetail() {
               onClick={() => setMetronomeOpen(true)}
               aria-pressed={metronomeOpen}
               title="Open the practice metronome"
-              className={`ml-auto flex items-center gap-2 px-4 py-1.5 rounded-full text-xs font-mono border transition-all duration-200 ${
+              className={`order-first basis-full sm:order-none sm:basis-auto sm:ml-auto flex items-center justify-between gap-3 px-4 py-2.5 rounded-xl text-xs font-mono border transition-all duration-200 ${
                 metronomeOpen
                   ? "bg-[oklch(0.78_0.12_85)] border-[oklch(0.78_0.12_85)] text-[oklch(0.12_0.018_265)]"
-                  : "bg-[oklch(0.78_0.12_85/0.12)] border-[oklch(0.78_0.12_85/0.55)] text-[oklch(0.78_0.12_85)] hover:bg-[oklch(0.78_0.12_85/0.22)]"
+                  : "bg-[oklch(0.78_0.12_85)] border-[oklch(0.86_0.12_85)] text-[oklch(0.12_0.018_265)] shadow-[0_0_24px_oklch(0.78_0.12_85/0.20)] hover:brightness-110"
               }`}
             >
-              <Timer size={13} /> Metronome
+              <span className="flex items-center gap-2"><Timer size={16} /><span className="text-left"><span className="block font-bold">Practice Metronome</span><span className="block text-[0.58rem] opacity-75 mt-0.5">BPM · Tap Tempo · Start</span></span></span><span className="text-[0.62rem] font-bold uppercase tracking-wider">Open</span>
             </button>
             {hasScore && (
               <button

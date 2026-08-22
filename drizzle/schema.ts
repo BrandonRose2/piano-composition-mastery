@@ -1,4 +1,4 @@
-import { int, mysqlEnum, mysqlTable, text, timestamp, varchar, json } from "drizzle-orm/mysql-core";
+import { int, mysqlEnum, mysqlTable, text, timestamp, varchar, json, uniqueIndex } from "drizzle-orm/mysql-core";
 
 /**
  * Core user table backing auth flow.
@@ -44,6 +44,8 @@ export const compositions = mysqlTable("compositions", {
   fileKey: varchar("fileKey", { length: 512 }),
   fileUrl: varchar("fileUrl", { length: 1024 }),
   fileName: varchar("fileName", { length: 512 }),
+  /** SHA-256 fingerprint of the uploaded bytes, scoped to the shared library. */
+  contentHash: varchar("contentHash", { length: 64 }),
   mimeType: varchar("mimeType", { length: 128 }),
   status: mysqlEnum("status", ["pending", "analyzing", "complete", "error"]).default("pending").notNull(),
   /** Full AI-generated analysis JSON */
@@ -53,7 +55,9 @@ export const compositions = mysqlTable("compositions", {
   errorMessage: text("errorMessage"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
-});
+}, (table) => [
+  uniqueIndex("compositions_user_content_hash_unique").on(table.userId, table.contentHash),
+]);
 
 export type Composition = typeof compositions.$inferSelect;
 export type InsertComposition = typeof compositions.$inferInsert;

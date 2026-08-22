@@ -8,8 +8,9 @@ import { useState, useCallback, useRef, useEffect } from "react";
 import { useLocation } from "wouter";
 import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
-import { Music, Upload, BookOpen, ChevronRight, Loader2, AlertCircle, CheckCircle2, Clock, Trash2, Youtube, ExternalLink, LogOut, User, Search, FileText, X, Download, Import, Link, Sparkles, ArrowRight, Check, Globe, FolderOpen, Archive, Library } from "lucide-react";
+import { Music, Upload, BookOpen, ChevronRight, Loader2, AlertCircle, CheckCircle2, Clock, Trash2, Youtube, ExternalLink, LogOut, User, Search, FileText, X, Download, Import, Link, Sparkles, ArrowRight, Check, Globe, FolderOpen, Archive, Library, Timer } from "lucide-react";
 import { ComposerFolderLibrary } from "@/components/ComposerFolderLibrary";
+import Metronome from "@/components/Metronome";
 import { useAuth } from "@/_core/hooks/useAuth";
 import JSZip from "jszip";
 
@@ -423,7 +424,9 @@ function SheetMusicSearch() {
 // ── Nav Bar ──────────────────────────────────────────────────────────────────
 function NavBar() {
   const { user, logout } = useAuth();
+  const [metronomeOpen, setMetronomeOpen] = useState(false);
   return (
+    <>
     <nav className="flex items-center justify-between mb-10 sm:mb-16 gap-2">
       <div className="flex items-center gap-3">
         <img src={LOGO_TREBLE} alt="Treble clef" className="h-9 w-auto" />
@@ -448,6 +451,13 @@ function NavBar() {
             <FolderOpen size={11} /><span className="ml-1">Auto-Import</span>
           </a>
           <button
+            onClick={() => setMetronomeOpen(true)}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-mono font-bold bg-[oklch(0.78_0.12_85)] text-[oklch(0.12_0.018_265)] border border-[oklch(0.86_0.12_85)] shadow-[0_0_18px_oklch(0.78_0.12_85/0.18)] hover:brightness-110 transition-all duration-150 active:scale-95"
+            title="Open the practice metronome"
+          >
+            <Timer size={13} /><span>Metronome</span>
+          </button>
+          <button
             onClick={() => logout()}
             className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-mono
               text-[oklch(0.68_0.012_265)] border border-[oklch(0.22_0.016_265)]
@@ -460,6 +470,22 @@ function NavBar() {
         </div>
       )}
     </nav>
+    {metronomeOpen && (
+      <div className="fixed inset-0 z-[100] flex items-end sm:items-center justify-center bg-black/75 backdrop-blur-sm p-3 sm:p-6" onClick={() => setMetronomeOpen(false)}>
+        <section className="w-full max-w-sm rounded-2xl border border-[oklch(0.78_0.12_85/0.45)] bg-[oklch(0.14_0.018_265)] shadow-2xl p-5" role="dialog" aria-modal="true" aria-label="Practice metronome" onClick={(event) => event.stopPropagation()}>
+          <div className="flex items-start justify-between gap-4 mb-2">
+            <div>
+              <p className="font-mono text-[0.62rem] uppercase tracking-[0.18em] text-[oklch(0.78_0.12_85)]">Practice tool</p>
+              <h2 className="font-['Playfair_Display'] text-xl font-bold text-[oklch(0.92_0.01_85)]">Metronome</h2>
+            </div>
+            <button onClick={() => setMetronomeOpen(false)} className="p-2 text-[oklch(0.65_0.015_265)] hover:text-[oklch(0.92_0.01_85)]" aria-label="Close metronome"><X size={18} /></button>
+          </div>
+          <p className="text-xs leading-relaxed text-[oklch(0.62_0.015_265)] mb-4">Set a BPM, use <strong className="text-[oklch(0.78_0.12_85)]">Test Sound</strong> to confirm audio, then press Start.</p>
+          <Metronome />
+        </section>
+      </div>
+    )}
+    </>
   );
 }
 
@@ -546,8 +572,8 @@ function sourceLabel(source: string) {
   if (source === "mutopia") return { label: "Mutopia Project (Free)", color: "oklch(0.74_0.14_180)", bg: "oklch(0.42_0.14_180/0.15)", border: "oklch(0.42_0.14_180/0.35)" };
   if (source === "musopen") return { label: "Musopen (Free Catalog)", color: "oklch(0.73_0.13_205)", bg: "oklch(0.42_0.13_205/0.15)", border: "oklch(0.42_0.13_205/0.35)" };
   if (source === "free_scores") return { label: "Free-scores (Free)", color: "oklch(0.72_0.14_235)", bg: "oklch(0.42_0.14_235/0.15)", border: "oklch(0.42_0.14_235/0.35)" };
-  if (source === "musescore") return { label: "MuseScore · After Free Sources", color: "oklch(0.72_0.12_260)", bg: "oklch(0.42_0.12_260/0.15)", border: "oklch(0.42_0.12_260/0.35)" };
-  return { label: "Web", color: "oklch(0.65_0.015_265)", bg: "oklch(0.22_0.010_265/0.15)", border: "oklch(0.30_0.010_265/0.35)" };
+  if (source === "musescore" || source === "web") return { label: "Subscription · Last Resort", color: "oklch(0.72_0.12_260)", bg: "oklch(0.42_0.12_260/0.15)", border: "oklch(0.42_0.12_260/0.35)" };
+  return { label: "Source", color: "oklch(0.65_0.015_265)", bg: "oklch(0.22_0.010_265/0.15)", border: "oklch(0.30_0.010_265/0.35)" };
 }
 
 function isSpotifyLink(url: string) {
@@ -633,16 +659,10 @@ function FindAnyPiece() {
       sources: result.sources.filter((source) => ["imslp", "mutopia", "musopen", "free_scores", "youtube_description", "youtube_comments"].includes(source.source)),
     },
     {
-      id: "musescore",
-      title: "MuseScore — After Free Sources",
-      description: "Shown only after the Scribd and free-database search stages.",
-      sources: result.sources.filter((source) => source.source === "musescore"),
-    },
-    {
       id: "last-resort",
-      title: "Last Resort — Subscription Sources",
-      description: "Only shown when no preferred or free option is available.",
-      sources: result.sources.filter((source) => source.source === "web"),
+      title: "Subscription Sources — Last Resort",
+      description: "MuseScore and any other subscription source appear here only after Scribd and every free-score source have been checked.",
+      sources: result.sources.filter((source) => source.source === "musescore" || source.source === "web"),
     },
   ].filter((group) => group.sources.length > 0) : [];
 
@@ -699,7 +719,7 @@ function FindAnyPiece() {
         </button>
       </div>
       <p className="text-xs text-[oklch(0.38_0.012_265)] text-center mb-4">
-        Search order: <span className="text-[oklch(0.78_0.12_85)]">Scribd first</span> → free score databases → MuseScore → subscription-only sites last
+        Search order: <span className="text-[oklch(0.78_0.12_85)]">Scribd first</span> → free score databases → subscription sources only as a last resort
       </p>
 
       {/* Progress steps while searching */}
@@ -713,7 +733,7 @@ function FindAnyPiece() {
               { label: "Searching the Scribd catalog first", icon: Library },
               { label: "Searching free score databases (IMSLP, Mutopia, Musopen, Free-scores)", icon: Globe },
               ...(isYouTube ? [{ label: "Checking direct public links in the video", icon: Youtube }] : []),
-              { label: "Checking MuseScore only after free sources", icon: Music },
+              { label: "Checking MuseScore only as the final fallback", icon: Music },
             ].map(({ label, icon: Icon }, i) => (
               <div key={i} className="flex items-center gap-3">
                 <div className="w-5 h-5 rounded-full border border-[oklch(0.78_0.12_85/0.4)] flex items-center justify-center">
@@ -761,7 +781,7 @@ function FindAnyPiece() {
               <p className="text-[0.65rem] font-mono uppercase tracking-widest text-[oklch(0.78_0.12_85)]">Source order used for this search</p>
             </div>
             <p className="text-xs text-[oklch(0.65_0.015_265)] leading-relaxed">
-              {(result.sourceSearchOrder?.length ? result.sourceSearchOrder : ["1. Scribd catalog and your saved Scribd library", "2. Free public score databases", "3. MuseScore after free sources"]).join("  ·  ")}
+              {(result.sourceSearchOrder?.length ? result.sourceSearchOrder : ["1. Scribd catalog and your saved Scribd library", "2. Free public score databases", "3. MuseScore only as the last resort"]).join("  ·  ")}
             </p>
           </div>
 
@@ -876,6 +896,7 @@ function FindAnyPiece() {
 function MyScribdLibrary() {
   const [searchQuery, setSearchQuery] = useState("");
   const [submittedQuery, setSubmittedQuery] = useState("");
+  const [isExpanded, setIsExpanded] = useState(false);
 
   const { data: allDocs = [], isLoading } = trpc.scribd.getSavedDocs.useQuery();
   const { data: searchResults = [], isFetching: isSearching } = trpc.scribd.searchSaved.useQuery(
@@ -901,7 +922,7 @@ function MyScribdLibrary() {
   return (
     <div className="mb-16">
       {/* Section header */}
-      <div className="flex items-center gap-3 mb-6">
+      <div className="flex items-center gap-3 mb-4">
         <span className="text-[oklch(0.78_0.12_85)]">♪</span>
         <div className="flex-1 h-px bg-gradient-to-r from-[oklch(0.78_0.12_85/0.4)] to-transparent" />
         <div className="flex items-center gap-2">
@@ -912,9 +933,36 @@ function MyScribdLibrary() {
           </span>
         </div>
         <div className="flex-1 h-px bg-gradient-to-l from-[oklch(0.78_0.12_85/0.4)] to-transparent" />
-        <span className="text-[oklch(0.78_0.12_85)]">♪</span>
+        <button
+          type="button"
+          onClick={() => setIsExpanded((expanded) => !expanded)}
+          aria-expanded={isExpanded}
+          className="shrink-0 flex items-center gap-1.5 rounded-lg border border-[oklch(0.78_0.18_85/0.35)] bg-[oklch(0.78_0.18_85/0.08)] px-3 py-1.5 text-[0.65rem] font-mono font-bold text-[oklch(0.78_0.18_85)] hover:bg-[oklch(0.78_0.18_85/0.16)] transition-all"
+        >
+          {isExpanded ? "Collapse" : "Browse & Search"}
+          <ChevronRight size={13} className={`transition-transform duration-150 ${isExpanded ? "rotate-90" : ""}`} />
+        </button>
       </div>
 
+      {!isExpanded ? (
+        <button
+          type="button"
+          onClick={() => setIsExpanded(true)}
+          className="w-full nocturne-card p-4 flex items-center justify-between gap-4 text-left hover:border-[oklch(0.78_0.18_85/0.45)] hover:bg-[oklch(0.17_0.016_265)] transition-all"
+        >
+          <div className="flex items-center gap-3 min-w-0">
+            <div className="w-9 h-9 rounded-lg bg-[oklch(0.78_0.18_85/0.12)] border border-[oklch(0.78_0.18_85/0.25)] flex items-center justify-center shrink-0">
+              <Library size={15} className="text-[oklch(0.78_0.18_85)]" />
+            </div>
+            <div>
+              <p className="text-sm font-medium text-[oklch(0.88_0.01_85)]">Scribd is ready when you need it</p>
+              <p className="text-xs text-[oklch(0.52_0.012_265)] mt-0.5">Browse or search your {allDocs.length} saved documents without cluttering your practice library.</p>
+            </div>
+          </div>
+          <ChevronRight size={16} className="shrink-0 text-[oklch(0.78_0.18_85)]" />
+        </button>
+      ) : (
+        <>
       {/* Search bar */}
       <form onSubmit={handleSearch} className="flex items-center gap-2 mb-4">
         <div className="flex-1 flex items-center gap-2 rounded-xl border border-[oklch(0.28_0.016_265)] bg-[oklch(0.14_0.010_265)] px-3 py-2.5 focus-within:border-[oklch(0.55_0.08_85)] transition-colors">
@@ -976,6 +1024,8 @@ function MyScribdLibrary() {
             </p>
           )}
         </div>
+      )}
+        </>
       )}
     </div>
   );
@@ -1363,7 +1413,7 @@ function LaCampanellaCard() {
 // ── Main Component ────────────────────────────────────────────────────────────
 export default function Home() {
   const [uploading, setUploading] = useState(false);
-  const [zipBatch, setZipBatch] = useState<{ name: string; status: 'pending' | 'uploading' | 'done' | 'error'; error?: string }[]>([]);
+  const [zipBatch, setZipBatch] = useState<{ name: string; status: 'pending' | 'uploading' | 'done' | 'skipped' | 'error'; error?: string }[]>([]);
   const [zipBatchDone, setZipBatchDone] = useState(false);
   const utils = trpc.useUtils();
 
@@ -1434,18 +1484,19 @@ export default function Home() {
   });
 
   // Upload a single PDF file (used both standalone and from ZIP batch)
-  const uploadSingleFile = useCallback(async (file: File): Promise<void> => {
+  const uploadSingleFile = useCallback(async (file: File): Promise<{ duplicate?: boolean }> => {
     const [base64Data, extractedText] = await Promise.all([
       fileToBase64(file),
       extractTextFromFile(file),
     ]);
-    await uploadMutation.mutateAsync({
+    const result = await uploadMutation.mutateAsync({
       fileName: file.name,
       mimeType: file.type || "application/pdf",
       base64Data,
       extractedText,
     });
     utils.compositions.list.invalidate();
+    return { duplicate: Boolean((result as { duplicate?: boolean }).duplicate) };
   }, [uploadMutation, utils]);
 
   const handleUpload = useCallback(async (file: File) => {
@@ -1482,6 +1533,7 @@ export default function Home() {
 
         let successCount = 0;
         let errorCount = 0;
+        let skippedCount = 0;
 
         for (let i = 0; i < pdfEntries.length; i++) {
           const { name, entry } = pdfEntries[i];
@@ -1498,11 +1550,12 @@ export default function Home() {
               continue;
             }
             const pdfFile = new File([arrayBuffer], name, { type: 'application/pdf' });
-            await uploadSingleFile(pdfFile);
+            const outcome = await uploadSingleFile(pdfFile);
             setZipBatch(prev => prev.map((item, idx) =>
-              idx === i ? { ...item, status: 'done' } : item
+              idx === i ? { ...item, status: outcome.duplicate ? 'skipped' : 'done', error: outcome.duplicate ? 'Already in library' : undefined } : item
             ));
-            successCount++;
+            if (outcome.duplicate) skippedCount++;
+            else successCount++;
           } catch (err: any) {
             setZipBatch(prev => prev.map((item, idx) =>
               idx === i ? { ...item, status: 'error', error: err?.message ?? 'Upload failed' } : item
@@ -1513,7 +1566,7 @@ export default function Home() {
 
         setZipBatchDone(true);
         if (successCount > 0) {
-          toast.success(`ZIP import complete: ${successCount} score${successCount !== 1 ? 's' : ''} imported${errorCount > 0 ? `, ${errorCount} failed` : ''}.`);
+          toast.success(`ZIP import complete: ${successCount} score${successCount !== 1 ? 's' : ''} imported${skippedCount > 0 ? `, ${skippedCount} duplicate${skippedCount !== 1 ? 's' : ''} skipped` : ''}${errorCount > 0 ? `, ${errorCount} failed` : ''}.`);
         } else {
           toast.error(`ZIP import failed: all ${errorCount} files had errors.`);
         }
@@ -1532,8 +1585,8 @@ export default function Home() {
 
     setUploading(true);
     try {
-      await uploadSingleFile(file);
-      toast.success("Score uploaded! AI analysis is running — it will be ready in about 30 seconds.");
+      const outcome = await uploadSingleFile(file);
+      toast[outcome.duplicate ? "info" : "success"](outcome.duplicate ? "That score is already in your library — no duplicate was added." : "Score uploaded! AI analysis is running — it will be ready in about 30 seconds.");
     } catch (err: any) {
       toast.error("Upload failed: " + (err?.message ?? 'Unknown error'));
     } finally {
@@ -1624,7 +1677,7 @@ export default function Home() {
               <div className="h-1.5 w-full rounded-full bg-[oklch(0.20_0.016_265)] overflow-hidden mb-4">
                 <div
                   className="h-full rounded-full bg-gradient-to-r from-[oklch(0.65_0.10_85)] to-[oklch(0.78_0.12_85)] transition-all duration-500"
-                  style={{ width: `${Math.round((zipBatch.filter(f => f.status === 'done' || f.status === 'error').length / zipBatch.length) * 100)}%` }}
+                  style={{ width: `${Math.round((zipBatch.filter(f => f.status === 'done' || f.status === 'skipped' || f.status === 'error').length / zipBatch.length) * 100)}%` }}
                 />
               </div>
               {/* Per-file list */}
@@ -1635,16 +1688,21 @@ export default function Home() {
                       {item.status === 'pending' && <span className="w-2 h-2 rounded-full bg-[oklch(0.35_0.010_265)]" />}
                       {item.status === 'uploading' && <Loader2 size={12} className="text-[oklch(0.78_0.12_85)] animate-spin" />}
                       {item.status === 'done' && <CheckCircle2 size={12} className="text-emerald-400" />}
+                      {item.status === 'skipped' && <Check size={12} className="text-amber-300" />}
                       {item.status === 'error' && <AlertCircle size={12} className="text-red-400" />}
                     </span>
                     <span className={`flex-1 truncate font-mono ${
                       item.status === 'done' ? 'text-[oklch(0.72_0.015_265)]' :
+                      item.status === 'skipped' ? 'text-amber-300/80' :
                       item.status === 'error' ? 'text-red-400' :
                       item.status === 'uploading' ? 'text-[oklch(0.88_0.01_85)]' :
                       'text-[oklch(0.45_0.012_265)]'
                     }`}>{item.name}</span>
                     {item.status === 'error' && item.error && (
                       <span className="shrink-0 text-[0.6rem] text-red-400/70">{item.error}</span>
+                    )}
+                    {item.status === 'skipped' && item.error && (
+                      <span className="shrink-0 text-[0.6rem] text-amber-300/70">{item.error}</span>
                     )}
                   </div>
                 ))}

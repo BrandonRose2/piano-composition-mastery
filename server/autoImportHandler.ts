@@ -13,9 +13,10 @@
 import type { Request, Response } from "express";
 import { sdk } from "./_core/sdk";
 import { storagePut } from "./storage";
-import { createComposition, getImportedFilenames, recordImportedFile, updateCompositionStatus, getUserByOpenId } from "./db";
+import { createComposition, getImportedFilenames, recordImportedFile, updateCompositionStatus, getUserByOpenId, findDuplicateComposition, resolveLibraryOwnerId } from "./db";
 import { analyzeComposition } from "./analyzeComposition";
 import { ENV } from "./_core/env";
+import { createHash } from "crypto";
 
 export async function autoImportHandler(req: Request, res: Response) {
   try {
@@ -51,13 +52,25 @@ export async function autoImportHandler(req: Request, res: Response) {
     // Decode base64 → Buffer
     const buffer = Buffer.from(base64, "base64");
 
+    // Look up the canonical shared library owner before checking content.
+    const ownerUser = await getUserByOpenId(ENV.ownerOpenId);
+    const ownerUserId = await resolveLibraryOwnerId(ownerUser?.id ?? 1);
+    const contentHash = createHash("sha256").update(buffer).digest("hex");
+    const duplicate = await findDuplicateComposition(ownerUserId, { fileName: filename, contentHash });
+    if (duplicate) {
+      await recordImportedFile({
+        filename,
+        status: "skipped",
+        errorMessage: "Already in library",
+        compositionId: duplicate.id,
+        fileSize: fileSize ?? buffer.length,
+      });
+      return res.json({ ok: true, skipped: true, reason: "already_in_library", compositionId: duplicate.id });
+    }
+
     // Upload to S3
     const fileKey = `auto-import/${Date.now()}-${filename}`;
     const { url: fileUrl } = await storagePut(fileKey, buffer, mimeType);
-
-    // Look up the owner user so compositions are scoped correctly
-    const ownerUser = await getUserByOpenId(ENV.ownerOpenId);
-    const ownerUserId = ownerUser?.id ?? null;
 
     // Create composition record scoped to the owner
     const titleFromFilename = filename.replace(/\.[^.]+$/, "").replace(/[-_]/g, " ");
@@ -67,6 +80,7 @@ export async function autoImportHandler(req: Request, res: Response) {
       fileKey,
       fileUrl,
       fileName: filename,
+      contentHash,
       mimeType,
       status: "analyzing",
     });
