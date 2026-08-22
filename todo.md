@@ -143,3 +143,16 @@
 ## Updated User Guide
 - [x] Create refreshed PDF guide covering current library, composer folders, import, finder, practice, and recovery workflows
 - [x] Redesign the user-guide PDF with the portal’s dark velvet-and-gold styling and rename it to Piano Composition Mastery Portal
+
+## Finder Source Priority
+- [x] Search the Scribd saved-library cache and Scribd catalog first for every title, Spotify, YouTube, or text query
+- [x] Present free score sources before MuseScore, including IMSLP and other no-cost databases
+- [x] Place MuseScore after free public sources and label it clearly
+- [x] Show subscription-required sources only as a clearly labeled last-resort section
+- [x] Display the active source-search sequence in the finder results
+
+## Metronome and Comprehensive Guide
+- [x] Inspect the metronome control, audio behavior, and placement on composition pages
+- [x] Make the metronome more visible and accessible on desktop and mobile
+- [x] Verify the metronome starts, stops, changes tempo, and remains usable in split-screen practice
+- [x] Expand the user-guide PDF into a full feature-by-feature walkthrough, including the metronome, score viewer, print, split-screen, library organization, import, finder, Scribd, analysis, and recovery flows

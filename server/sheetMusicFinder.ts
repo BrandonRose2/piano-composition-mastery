@@ -3,10 +3,10 @@
  * Given a YouTube URL OR Spotify track/album/playlist URL:
  *  1. Extract track/video metadata (title, artist/channel)
  *  2. Use AI to identify the composition name + composer
- *  3. Search Scribd (authenticated with session cookie)
- *  4. Scan YouTube description + top comments for PDF links (YouTube only)
- *  5. Fallback: search IMSLP and MuseScore
- * Returns a ranked list of PDF sources.
+ *  3. Search Scribd catalog first (including the user's subscription session)
+ *  4. Search free public sources: IMSLP and direct public links (YouTube only)
+ *  5. Offer MuseScore only after the preceding sources
+ * Returns an intentionally ordered list of score sources.
  */
 
 import { invokeLLM } from "./_core/llm";
@@ -15,7 +15,7 @@ import { callDataApi } from "./_core/dataApi";
 // ── Types ─────────────────────────────────────────────────────────────────────
 
 export interface SheetMusicResult {
-  source: "scribd" | "youtube_description" | "youtube_comments" | "imslp" | "musescore" | "web";
+  source: "scribd" | "youtube_description" | "youtube_comments" | "imslp" | "mutopia" | "musopen" | "free_scores" | "musescore" | "web";
   title: string;
   url: string;
   pdfUrl?: string;           // direct PDF download URL if available
@@ -31,7 +31,44 @@ export interface FinderResult {
   compositionName: string;
   composer: string;
   sources: SheetMusicResult[];
+  sourceSearchOrder?: string[];
   error?: string;
+}
+
+const SOURCE_PRIORITY: Record<SheetMusicResult["source"], number> = {
+  scribd: 10,
+  imslp: 20,
+  mutopia: 21,
+  musopen: 22,
+  free_scores: 23,
+  youtube_description: 30,
+  youtube_comments: 31,
+  musescore: 40,
+  web: 90,
+};
+
+/** Sort sources into the exact portal policy: Scribd → free sources → MuseScore → last resort. */
+export function orderSourcesByPriority(sources: SheetMusicResult[]): SheetMusicResult[] {
+  return [...sources].sort((a, b) => SOURCE_PRIORITY[a.source] - SOURCE_PRIORITY[b.source]);
+}
+
+function dedupeSources(sources: SheetMusicResult[]): SheetMusicResult[] {
+  const seen = new Set<string>();
+  return orderSourcesByPriority(sources).filter((source) => {
+    if (seen.has(source.url)) return false;
+    seen.add(source.url);
+    return true;
+  });
+}
+
+function searchOrderFor(hasYouTubeLinks: boolean): string[] {
+  return [
+    "1. Scribd catalog and your saved Scribd library",
+    "2. Free public score databases (IMSLP, Mutopia, Musopen, and Free-scores)",
+    ...(hasYouTubeLinks ? ["3. Direct public score links from the YouTube description and comments"] : []),
+    `${hasYouTubeLinks ? "4" : "3"}. MuseScore after the free-source search`,
+    `${hasYouTubeLinks ? "5" : "4"}. Other subscription sites only when explicitly added as a last resort`,
+  ];
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -264,6 +301,66 @@ async function searchScribd(
   return results;
 }
 
+/**
+ * Always expose Scribd as the first catalog search. If the bot-protected result
+ * page cannot be read server-side, the browser receives a first-position catalog
+ * link that opens in the user's authenticated Scribd session.
+ */
+async function searchScribdFirst(
+  compositionName: string,
+  composer: string,
+  sessionCookie: string
+): Promise<SheetMusicResult[]> {
+  const catalogMatches = await searchScribd(compositionName, composer, sessionCookie);
+  if (catalogMatches.length > 0) return catalogMatches;
+
+  const query = [composer !== "Unknown" ? composer : "", compositionName, "piano sheet music"]
+    .filter(Boolean)
+    .join(" ");
+  const url = `https://www.scribd.com/search?query=${encodeURIComponent(query)}&content_type=documents`;
+
+  return [{
+    source: "scribd",
+    title: `Search Scribd Catalog: “${compositionName}”`,
+    url,
+    previewUrl: url,
+    canImportDirectly: false,
+    confidence: "medium",
+    notes: "Scribd was checked first. Open this catalog search in your subscribed Scribd session to browse matching scores.",
+  }];
+}
+
+/** Execute the portal's fixed order: Scribd → free sources → MuseScore → last resort. */
+async function runPrioritizedSourceSearch(
+  compositionName: string,
+  composer: string,
+  scribdSessionCookie: string,
+  youtube?: { videoId: string; description: string }
+): Promise<{ sources: SheetMusicResult[]; sourceSearchOrder: string[] }> {
+  // Intentional sequence: public/community searches wait until Scribd was checked.
+  const scribdResults = await searchScribdFirst(compositionName, composer, scribdSessionCookie);
+
+  const [imslpResults, youtubeResults] = await Promise.all([
+    searchImslp(compositionName, composer),
+    youtube ? scanYouTubeLinks(youtube.videoId, youtube.description) : Promise.resolve([]),
+  ]);
+  const freeCatalogResults = searchFreeCatalogs(compositionName, composer);
+
+  // MuseScore is intentionally evaluated only after the preceding free sources.
+  const musescoreResults = await searchMusescore(compositionName, composer);
+
+  return {
+    sources: dedupeSources([
+      ...scribdResults,
+      ...imslpResults,
+      ...freeCatalogResults,
+      ...youtubeResults,
+      ...musescoreResults,
+    ]),
+    sourceSearchOrder: searchOrderFor(!!youtube),
+  };
+}
+
 /** Scan YouTube video description and comments for PDF/sheet music links */
 async function scanYouTubeLinks(
   videoId: string,
@@ -374,6 +471,48 @@ async function searchImslp(
   return results;
 }
 
+/**
+ * Add focused searches for established free score catalogs. These sites may block
+ * automated scraping, so their result cards open a targeted catalog search in the
+ * user's browser rather than pretending that the server downloaded a score.
+ */
+function searchFreeCatalogs(compositionName: string, composer: string): SheetMusicResult[] {
+  const query = [composer !== "Unknown" ? composer : "", compositionName, "piano sheet music"]
+    .filter(Boolean)
+    .join(" ");
+  const focusedSearch = (domain: string) => `https://duckduckgo.com/?q=${encodeURIComponent(`site:${domain} ${query}`)}`;
+
+  return [
+    {
+      source: "mutopia",
+      title: `Search Mutopia Project: “${compositionName}”`,
+      url: focusedSearch("mutopiaproject.org"),
+      previewUrl: focusedSearch("mutopiaproject.org"),
+      canImportDirectly: false,
+      confidence: "low",
+      notes: "Free, downloadable public-domain and openly licensed editions.",
+    },
+    {
+      source: "musopen",
+      title: `Search Musopen’s free score catalog: “${compositionName}”`,
+      url: focusedSearch("musopen.org"),
+      previewUrl: focusedSearch("musopen.org"),
+      canImportDirectly: false,
+      confidence: "low",
+      notes: "Free public-domain score catalog; availability varies by work.",
+    },
+    {
+      source: "free_scores",
+      title: `Search Free-scores: “${compositionName}”`,
+      url: focusedSearch("free-scores.com"),
+      previewUrl: focusedSearch("free-scores.com"),
+      canImportDirectly: false,
+      confidence: "low",
+      notes: "Free score database with piano arrangements and printable material.",
+    },
+  ];
+}
+
 /** Search MuseScore for free scores */
 async function searchMusescore(
   compositionName: string,
@@ -415,30 +554,15 @@ export async function findSheetMusicFromText(
   const { compositionName, composer } = identified;
   console.log(`[SheetFinder] Identified: "${compositionName}" by ${composer}`);
 
-  // Run all searches in parallel
-  const [scribdResults, imslpResults, musescoreResults] = await Promise.all([
-    searchScribd(compositionName, composer, scribdSessionCookie),
-    searchImslp(compositionName, composer),
-    searchMusescore(compositionName, composer),
-  ]);
-
-  const seen = new Set<string>();
-  const allSources: SheetMusicResult[] = [
-    ...scribdResults,
-    ...imslpResults,
-    ...musescoreResults,
-  ].filter(r => {
-    if (seen.has(r.url)) return false;
-    seen.add(r.url);
-    return true;
-  });
+  const prioritized = await runPrioritizedSourceSearch(compositionName, composer, scribdSessionCookie);
 
   return {
     videoId: "",
     videoTitle: query,
     compositionName,
     composer,
-    sources: allSources,
+    sources: prioritized.sources,
+    sourceSearchOrder: prioritized.sourceSearchOrder,
   };
 }
 
@@ -474,35 +598,20 @@ export async function findSheetMusicFromYouTube(
   const { compositionName, composer } = await identifyComposition(videoTitle, description, channelTitle);
   console.log(`[SheetFinder] Identified: "${compositionName}" by ${composer}`);
 
-  // Step 3–6: Run all searches in parallel
-  const [scribdResults, ytResults, imslpResults, musescoreResults] = await Promise.all([
-    searchScribd(compositionName, composer, scribdSessionCookie),
-    scanYouTubeLinks(videoId, description),
-    searchImslp(compositionName, composer),
-    searchMusescore(compositionName, composer),
-  ]);
-
-  // Merge and deduplicate by URL
-  const seen = new Set<string>();
-  const allSources: SheetMusicResult[] = [
-    ...scribdResults,
-    ...ytResults,
-    ...imslpResults,
-    ...musescoreResults,
-  ].filter(r => {
-    if (seen.has(r.url)) return false;
-    seen.add(r.url);
-    return true;
+  const prioritized = await runPrioritizedSourceSearch(compositionName, composer, scribdSessionCookie, {
+    videoId,
+    description,
   });
 
-  console.log(`[SheetFinder] Found ${allSources.length} sources total`);
+  console.log(`[SheetFinder] Found ${prioritized.sources.length} sources total`);
 
   return {
     videoId,
     videoTitle,
     compositionName,
     composer,
-    sources: allSources,
+    sources: prioritized.sources,
+    sourceSearchOrder: prioritized.sourceSearchOrder,
   };
 }
 
@@ -540,40 +649,9 @@ export async function findSheetMusicFromSpotify(
   const { compositionName, composer, isArrangement } = identified;
   console.log(`[SheetFinder] Identified: "${compositionName}" by ${composer} (arrangement: ${isArrangement})`);
 
-  // Step 3–5: Run searches in parallel
-  // For arrangements, search for BOTH the specific arrangement AND the original
-  const searchPromises: Promise<SheetMusicResult[]>[] = [
-    searchScribd(compositionName, composer, scribdSessionCookie),
-    searchImslp(compositionName, composer),
-    searchMusescore(compositionName, composer),
-  ];
+  const prioritized = await runPrioritizedSourceSearch(compositionName, composer, scribdSessionCookie);
 
-  const results = await Promise.all(searchPromises);
-  let [scribdResults, imslpResults, musescoreResults] = results;
-
-  // If it's an arrangement and we found few results, also search for the original
-  if (isArrangement && scribdResults.length + imslpResults.length < 3) {
-    // Re-run with just the arranger name to find their specific sheet music
-    const arrangerScribd = await searchScribd(compositionName, composer, scribdSessionCookie);
-    // Also search MuseScore specifically for the arranger
-    const arrangerMusescore = await searchMusescore(compositionName, composer);
-    scribdResults = [...scribdResults, ...arrangerScribd];
-    musescoreResults = [...musescoreResults, ...arrangerMusescore];
-  }
-
-  // Merge and deduplicate
-  const seen = new Set<string>();
-  const allSources: SheetMusicResult[] = [
-    ...scribdResults,
-    ...imslpResults,
-    ...musescoreResults,
-  ].filter(r => {
-    if (seen.has(r.url)) return false;
-    seen.add(r.url);
-    return true;
-  });
-
-  console.log(`[SheetFinder] Spotify search found ${allSources.length} sources`);
+  console.log(`[SheetFinder] Spotify search found ${prioritized.sources.length} sources`);
 
   // Build a clear display name that shows both arranger and original if applicable
   const displayComposer = isArrangement
@@ -585,6 +663,7 @@ export async function findSheetMusicFromSpotify(
     videoTitle: trackTitle,
     compositionName,
     composer: displayComposer,
-    sources: allSources,
+    sources: prioritized.sources,
+    sourceSearchOrder: prioritized.sourceSearchOrder,
   };
 }

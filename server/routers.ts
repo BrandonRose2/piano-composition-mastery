@@ -497,10 +497,9 @@ export const appRouter = router({
   findSheetMusic: protectedProcedure
     .input(z.object({ url: z.string().min(1) }))
       .mutation(async ({ input, ctx }) => {
-      const cookie = ENV.scribdSessionCookie;
-      if (!cookie) {
-        throw new Error("Scribd session cookie not configured. Please contact the portal admin.");
-      }
+      // A browser-friendly catalog link is still returned when the server session
+      // cannot scrape Scribd. This keeps Scribd first instead of blocking the finder.
+      const cookie = ENV.scribdSessionCookie ?? "";
       const url = input.url.trim();
       let result;
       // Detect input type: Spotify link, YouTube link, or plain text query
@@ -535,12 +534,12 @@ export const appRouter = router({
               confidence: "high" as const,
               notes: "From your Scribd library",
             }));
-            // Prepend saved results before any other Scribd results
+            // Prepend saved results before the first-position Scribd catalog result and all free sources.
             result = {
               ...result,
               sources: [
                 ...savedResults,
-                ...(result.sources ?? []).filter((r: { source: string }) => r.source !== "scribd"),
+                ...(result.sources ?? []),
               ],
             };
           }

@@ -915,11 +915,23 @@ export default function CompositionDetail() {
             {[analysis.difficulty, analysis.key, analysis.estimatedDuration].filter(Boolean).map((tag: string) => (
               <span key={tag} className="text-xs font-mono text-[oklch(0.60_0.012_265)] border border-[oklch(0.28_0.018_265)] rounded-full px-3 py-1">{tag}</span>
             ))}
+            <button
+              onClick={() => setMetronomeOpen(true)}
+              aria-pressed={metronomeOpen}
+              title="Open the practice metronome"
+              className={`ml-auto flex items-center gap-2 px-4 py-1.5 rounded-full text-xs font-mono border transition-all duration-200 ${
+                metronomeOpen
+                  ? "bg-[oklch(0.78_0.12_85)] border-[oklch(0.78_0.12_85)] text-[oklch(0.12_0.018_265)]"
+                  : "bg-[oklch(0.78_0.12_85/0.12)] border-[oklch(0.78_0.12_85/0.55)] text-[oklch(0.78_0.12_85)] hover:bg-[oklch(0.78_0.12_85/0.22)]"
+              }`}
+            >
+              <Timer size={13} /> Metronome
+            </button>
             {hasScore && (
               <button
                 onClick={() => { const entering = !splitScreen; setSplitScreen(s => !s); setSplitVideoScreen(false); if (entering && stopPlayingRef.current) stopPlayingRef.current(); }}
                 title={splitScreen ? "Exit split-screen" : isBuiltIn ? "Split-screen: IMSLP Score + Tracker" : "Split-screen: Score + Tracker"}
-                className={`ml-auto flex items-center gap-2 px-4 py-1.5 rounded-full text-xs font-mono border transition-all duration-200 ${
+                className={`flex items-center gap-2 px-4 py-1.5 rounded-full text-xs font-mono border transition-all duration-200 ${
                   splitScreen
                     ? "bg-[oklch(0.78_0.12_85/0.15)] border-[oklch(0.78_0.12_85/0.6)] text-[oklch(0.78_0.12_85)]"
                     : "border-[oklch(0.30_0.018_265)] text-[oklch(0.72_0.015_265)] hover:border-[oklch(0.78_0.12_85/0.5)] hover:text-[oklch(0.78_0.12_85)]"
@@ -1873,6 +1885,7 @@ export default function CompositionDetail() {
                 <X size={14} />
               </button>
             </div>
+            <p className="text-[0.65rem] text-[oklch(0.55_0.012_265)] mb-3">Choose a BPM, or tap a tempo, then press Start.</p>
             <Metronome />
           </div>
         )}

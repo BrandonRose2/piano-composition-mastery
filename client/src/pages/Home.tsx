@@ -524,6 +524,7 @@ type FinderResult = {
   videoTitle: string;
   compositionName: string;
   composer: string;
+  sourceSearchOrder?: string[];
   sources: Array<{
     source: string;
     title: string;
@@ -538,11 +539,14 @@ type FinderResult = {
 
 function sourceLabel(source: string) {
   if (source === "scribd_saved") return { label: "Your Scribd Library ★", color: "oklch(0.82_0.18_85)", bg: "oklch(0.50_0.18_85/0.20)", border: "oklch(0.60_0.18_85/0.50)" };
-  if (source === "scribd") return { label: "Scribd", color: "oklch(0.72_0.14_145)", bg: "oklch(0.42_0.14_145/0.15)", border: "oklch(0.42_0.14_145/0.35)" };
+  if (source === "scribd") return { label: "Scribd Catalog · First", color: "oklch(0.82_0.18_85)", bg: "oklch(0.50_0.18_85/0.20)", border: "oklch(0.60_0.18_85/0.50)" };
   if (source === "youtube_description") return { label: "YouTube Description", color: "oklch(0.68_0.20_25)", bg: "oklch(0.45_0.22_25/0.15)", border: "oklch(0.45_0.22_25/0.35)" };
   if (source === "youtube_comments") return { label: "YouTube Comments", color: "oklch(0.68_0.20_25)", bg: "oklch(0.45_0.22_25/0.15)", border: "oklch(0.45_0.22_25/0.35)" };
   if (source === "imslp") return { label: "IMSLP (Free)", color: "oklch(0.72_0.14_220)", bg: "oklch(0.42_0.14_220/0.15)", border: "oklch(0.42_0.14_220/0.35)" };
-  if (source === "musescore") return { label: "MuseScore", color: "oklch(0.72_0.12_260)", bg: "oklch(0.42_0.12_260/0.15)", border: "oklch(0.42_0.12_260/0.35)" };
+  if (source === "mutopia") return { label: "Mutopia Project (Free)", color: "oklch(0.74_0.14_180)", bg: "oklch(0.42_0.14_180/0.15)", border: "oklch(0.42_0.14_180/0.35)" };
+  if (source === "musopen") return { label: "Musopen (Free Catalog)", color: "oklch(0.73_0.13_205)", bg: "oklch(0.42_0.13_205/0.15)", border: "oklch(0.42_0.13_205/0.35)" };
+  if (source === "free_scores") return { label: "Free-scores (Free)", color: "oklch(0.72_0.14_235)", bg: "oklch(0.42_0.14_235/0.15)", border: "oklch(0.42_0.14_235/0.35)" };
+  if (source === "musescore") return { label: "MuseScore · After Free Sources", color: "oklch(0.72_0.12_260)", bg: "oklch(0.42_0.12_260/0.15)", border: "oklch(0.42_0.12_260/0.35)" };
   return { label: "Web", color: "oklch(0.65_0.015_265)", bg: "oklch(0.22_0.010_265/0.15)", border: "oklch(0.30_0.010_265/0.35)" };
 }
 
@@ -609,6 +613,38 @@ function FindAnyPiece() {
   };
 
   const isSearching = findMutation.isPending;
+  const sourceGroups = result ? [
+    {
+      id: "saved-scribd",
+      title: "Your Saved Scribd Library",
+      description: "Already saved to your Scribd account.",
+      sources: result.sources.filter((source) => source.source === "scribd_saved"),
+    },
+    {
+      id: "scribd-catalog",
+      title: "Scribd Catalog — Checked First",
+      description: "Your primary Scribd subscription search.",
+      sources: result.sources.filter((source) => source.source === "scribd"),
+    },
+    {
+      id: "free-sources",
+      title: "Free Score Sources",
+      description: "Public-domain, openly licensed, or direct public-score links.",
+      sources: result.sources.filter((source) => ["imslp", "mutopia", "musopen", "free_scores", "youtube_description", "youtube_comments"].includes(source.source)),
+    },
+    {
+      id: "musescore",
+      title: "MuseScore — After Free Sources",
+      description: "Shown only after the Scribd and free-database search stages.",
+      sources: result.sources.filter((source) => source.source === "musescore"),
+    },
+    {
+      id: "last-resort",
+      title: "Last Resort — Subscription Sources",
+      description: "Only shown when no preferred or free option is available.",
+      sources: result.sources.filter((source) => source.source === "web"),
+    },
+  ].filter((group) => group.sources.length > 0) : [];
 
   return (
     <div className="mb-16">
@@ -663,7 +699,7 @@ function FindAnyPiece() {
         </button>
       </div>
       <p className="text-xs text-[oklch(0.38_0.012_265)] text-center mb-4">
-        Spotify link · YouTube URL · composition name · any text — the portal identifies the piece and searches Scribd, IMSLP &amp; MuseScore
+        Search order: <span className="text-[oklch(0.78_0.12_85)]">Scribd first</span> → free score databases → MuseScore → subscription-only sites last
       </p>
 
       {/* Progress steps while searching */}
@@ -673,9 +709,11 @@ function FindAnyPiece() {
           <div className="space-y-2.5">
             {[
               { label: isSpotify ? "Fetching Spotify track info" : isYouTube ? "Fetching YouTube video info" : "Identifying the composition", icon: Music },
-              { label: "Checking your Scribd saved library first", icon: Search },
-              { label: isYouTube ? "Scanning YouTube description & comments" : "Searching Scribd for sheet music", icon: isYouTube ? Youtube : Globe },
-              { label: "Checking IMSLP & MuseScore", icon: Globe },
+              { label: "Checking your saved Scribd library", icon: Search },
+              { label: "Searching the Scribd catalog first", icon: Library },
+              { label: "Searching free score databases (IMSLP, Mutopia, Musopen, Free-scores)", icon: Globe },
+              ...(isYouTube ? [{ label: "Checking direct public links in the video", icon: Youtube }] : []),
+              { label: "Checking MuseScore only after free sources", icon: Music },
             ].map(({ label, icon: Icon }, i) => (
               <div key={i} className="flex items-center gap-3">
                 <div className="w-5 h-5 rounded-full border border-[oklch(0.78_0.12_85/0.4)] flex items-center justify-center">
@@ -717,13 +755,35 @@ function FindAnyPiece() {
             )}
           </div>
 
+          <div className="rounded-xl border border-[oklch(0.78_0.12_85/0.24)] bg-[oklch(0.78_0.12_85/0.06)] px-4 py-3">
+            <div className="flex items-center gap-2 mb-1.5">
+              <Library size={13} className="text-[oklch(0.78_0.12_85)]" />
+              <p className="text-[0.65rem] font-mono uppercase tracking-widest text-[oklch(0.78_0.12_85)]">Source order used for this search</p>
+            </div>
+            <p className="text-xs text-[oklch(0.65_0.015_265)] leading-relaxed">
+              {(result.sourceSearchOrder?.length ? result.sourceSearchOrder : ["1. Scribd catalog and your saved Scribd library", "2. Free public score databases", "3. MuseScore after free sources"]).join("  ·  ")}
+            </p>
+          </div>
+
           {result.sources.length === 0 ? (
             <div className="nocturne-card p-6 text-center">
               <p className="text-[oklch(0.65_0.015_265)] text-sm">No sheet music found automatically.</p>
               <p className="text-[oklch(0.45_0.012_265)] text-xs mt-1">Try searching manually below using the composition name.</p>
             </div>
           ) : (
-            result.sources.map((src, i) => {
+            <div className="space-y-4">
+            {sourceGroups.map((group) => (
+              <section key={group.id} className="space-y-2" aria-label={group.title}>
+                <div className="flex items-center gap-3 px-1">
+                  <div className="h-px flex-1 bg-[oklch(0.30_0.018_265)]" />
+                  <div className="text-center">
+                    <p className="text-[0.62rem] font-mono uppercase tracking-[0.16em] text-[oklch(0.78_0.12_85)]">{group.title}</p>
+                    <p className="text-[0.65rem] text-[oklch(0.45_0.012_265)] mt-0.5">{group.description}</p>
+                  </div>
+                  <div className="h-px flex-1 bg-[oklch(0.30_0.018_265)]" />
+                </div>
+                <div className="space-y-3">
+                {group.sources.map((src, i) => {
               const badge = sourceLabel(src.source);
               const urlKey = src.pdfUrl ?? src.url;
               const isImported = importedUrls.has(urlKey);
@@ -770,6 +830,9 @@ function FindAnyPiece() {
                           <ExternalLink size={11} />
                           {src.source === "scribd" ? "Open in Scribd" :
                            src.source === "imslp" ? "Open IMSLP" :
+                           src.source === "mutopia" ? "Search Mutopia" :
+                           src.source === "musopen" ? "Search Musopen" :
+                           src.source === "free_scores" ? "Search Free-scores" :
                            src.source === "musescore" ? "Browse MuseScore" : "Open"}
                         </a>
                       )}
@@ -789,7 +852,7 @@ function FindAnyPiece() {
                       ) : null}
                     </div>
                     {/* Scribd / IMSLP / MuseScore: guide user to download then drag back */}
-                    {(src.source === "scribd" || src.source === "imslp" || src.source === "musescore") && !isImported && (
+                    {(src.source === "scribd" || src.source === "imslp" || src.source === "mutopia" || src.source === "musopen" || src.source === "free_scores" || src.source === "musescore") && !isImported && (
                       <p className="text-[0.6rem] text-[oklch(0.38_0.012_265)] text-right leading-tight max-w-[160px]">
                         Download the PDF, then drag it into the upload zone above
                       </p>
@@ -797,7 +860,11 @@ function FindAnyPiece() {
                   </div>
                 </div>
               );
-            })
+                })}
+                </div>
+              </section>
+            ))}
+            </div>
           )}
         </div>
       )}

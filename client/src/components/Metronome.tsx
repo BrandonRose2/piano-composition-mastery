@@ -28,6 +28,7 @@ export default function Metronome() {
   const [timeSig, setTimeSig] = useState(4);
   const [currentBeat, setCurrentBeat] = useState(0);
   const [tapTimes, setTapTimes] = useState<number[]>([]);
+  const [audioError, setAudioError] = useState<string | null>(null);
 
   const audioCtxRef = useRef<AudioContext | null>(null);
   const nextNoteTimeRef = useRef(0);
@@ -82,28 +83,40 @@ export default function Metronome() {
     schedulerRef.current = setTimeout(scheduler, 25);
   }, [scheduleNote]);
 
-  const start = useCallback(() => {
-    if (!audioCtxRef.current) {
-      audioCtxRef.current = new AudioContext();
+  const start = useCallback(async () => {
+    try {
+      const AudioContextClass = window.AudioContext || (window as typeof window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+      if (!AudioContextClass) {
+        setAudioError("Your browser does not support the Web Audio metronome.");
+        return;
+      }
+      if (!audioCtxRef.current) {
+        audioCtxRef.current = new AudioContextClass();
+      }
+      if (audioCtxRef.current.state === "suspended") {
+        await audioCtxRef.current.resume();
+      }
+      setAudioError(null);
+      currentBeatRef.current = 0;
+      nextNoteTimeRef.current = audioCtxRef.current.currentTime + 0.05;
+      isPlayingRef.current = true;
+      setIsPlaying(true);
+      scheduler();
+    } catch {
+      setAudioError("Sound could not start. Check that this browser tab is not muted, then try again.");
     }
-    if (audioCtxRef.current.state === "suspended") {
-      audioCtxRef.current.resume();
-    }
-    currentBeatRef.current = 0;
-    nextNoteTimeRef.current = audioCtxRef.current.currentTime + 0.05;
-    setIsPlaying(true);
-    scheduler();
   }, [scheduler]);
 
   const stop = useCallback(() => {
     if (schedulerRef.current) clearTimeout(schedulerRef.current);
+    isPlayingRef.current = false;
     setIsPlaying(false);
     setCurrentBeat(0);
   }, []);
 
-  const toggle = useCallback(() => {
+  const toggle = useCallback(async () => {
     if (isPlayingRef.current) stop();
-    else start();
+    else await start();
   }, [start, stop]);
 
   // Stop and restart when BPM or time sig changes while playing
@@ -158,7 +171,7 @@ export default function Metronome() {
   const tempoMark = getTempoMark(bpm);
 
   return (
-    <div className="metronome-widget">
+    <div className="metronome-widget" aria-live="polite">
       {/* BPM Display */}
       <div className="metro-bpm-display">
         <span className="metro-bpm-number">{bpm}</span>
@@ -186,6 +199,7 @@ export default function Metronome() {
           value={bpm}
           onChange={(e) => handleBpmChange(Number(e.target.value))}
           className="metro-slider"
+          aria-label="Tempo in beats per minute"
         />
         <span className="metro-slider-label">220</span>
       </div>
@@ -224,6 +238,7 @@ export default function Metronome() {
         <button
           className={`metro-play-btn ${isPlaying ? "metro-playing" : ""}`}
           onClick={toggle}
+          aria-pressed={isPlaying}
         >
           {isPlaying ? (
             <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
@@ -252,6 +267,7 @@ export default function Metronome() {
           </button>
         ))}
       </div>
+      {audioError && <p className="mt-3 text-center text-[0.7rem] text-amber-300/80 leading-snug">{audioError}</p>}
     </div>
   );
 }
