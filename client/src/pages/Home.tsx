@@ -1419,6 +1419,7 @@ export default function Home() {
 
   const [retryingAll, setRetryingAll] = useState(false);
   const retryAllMutation = trpc.compositions.retryAnalysis.useMutation();
+  const moveToComposerMutation = trpc.compositions.moveToComposer.useMutation();
 
   const { data: compositions = [], isLoading } = trpc.compositions.list.useQuery();
   const { data: progressSummaries = [] } = trpc.progress.summaryAll.useQuery();
@@ -1441,6 +1442,12 @@ export default function Home() {
     toast.success(`Re-running analysis on ${successCount} composition${successCount !== 1 ? "s" : ""}…`);
     setRetryingAll(false);
   }, [errorCompositions, retryingAll, retryAllMutation, utils]);
+
+  const handleMoveToComposer = useCallback(async (compositionId: number, composer: string) => {
+    await moveToComposerMutation.mutateAsync({ id: compositionId, composer });
+    await utils.compositions.list.invalidate();
+    toast.success(`Moved to ${composer}.`);
+  }, [moveToComposerMutation, utils]);
 
   // Build a lookup map: compositionId → { completedDays, percentage }
   const progressMap = Object.fromEntries(
@@ -1803,6 +1810,7 @@ export default function Home() {
             renderCard={(comp, ps) => (
               <CompositionCard composition={comp} progressSummary={ps} />
             )}
+            onMoveToComposer={handleMoveToComposer}
           />
         </div>
 

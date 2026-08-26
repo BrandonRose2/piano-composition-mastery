@@ -181,6 +181,16 @@ export async function updateCompositionStatus(
   await db.update(compositions).set(set).where(eq(compositions.id, id));
 }
 
+/** Save a user's manual composer-folder assignment without changing AI analysis data. */
+export async function updateCompositionComposerFolder(id: number, userId: number, composer: string) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  await db
+    .update(compositions)
+    .set({ composer })
+    .where(and(eq(compositions.id, id), eq(compositions.userId, userId)));
+}
+
 export async function deleteComposition(id: number, userId: number) {
   const db = await getDb();
   if (!db) throw new Error("Database not available");

@@ -32,6 +32,7 @@ import * as bcrypt from "bcryptjs";
 import { createHash } from "crypto";
 import { users } from "../drizzle/schema";
 import { eq } from "drizzle-orm";
+import { assignCompositionToComposerFolder } from "./composerFolderService";
 
 export const appRouter = router({
   system: systemRouter,
@@ -140,6 +141,17 @@ export const appRouter = router({
           .set({ title: input.title })
           .where(and(eq(compositions.id, input.id), eq(compositions.userId, userId)));
         return { success: true };
+      }),
+
+    /** Move a composition into a composer folder without changing its AI analysis. */
+    moveToComposer: protectedProcedure
+      .input(z.object({
+        id: z.number(),
+        composer: z.string().trim().min(1, "Choose a composer folder").max(256),
+      }))
+      .mutation(async ({ input, ctx }) => {
+        const userId = await resolveLibraryOwnerId(ctx.user.id);
+        return assignCompositionToComposerFolder({ id: input.id, userId, composer: input.composer });
       }),
 
     /** Delete a composition and all its progress records */

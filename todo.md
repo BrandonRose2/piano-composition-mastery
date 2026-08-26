@@ -182,3 +182,10 @@
 
 ## Composer Folder Defaults
 - [x] Load every composer folder in Your Library collapsed by default while retaining per-folder expand/collapse controls
+
+## Composer Folder Drag-and-Drop
+- [x] Persist a manual composer-folder assignment for each composition without changing its AI analysis
+- [x] Make library pieces draggable and composer folders valid drop targets
+- [x] Save a drag-and-drop move immediately and refresh folder counts and contents
+- [x] Provide an accessible fallback control to move a piece when dragging is unavailable
+- [x] Add automated coverage for composer-folder reassignment
