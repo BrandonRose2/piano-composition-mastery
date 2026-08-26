@@ -189,3 +189,8 @@
 - [x] Save a drag-and-drop move immediately and refresh folder counts and contents
 - [x] Provide an accessible fallback control to move a piece when dragging is unavailable
 - [x] Add automated coverage for composer-folder reassignment
+
+## AuthGuard Render-Phase Navigation Warning
+- [x] Move AuthGuard redirects out of the React render phase
+- [x] Add regression coverage for unauthenticated login-route behavior
+- [x] Diagnose and fix OAuth callback failure on the login flow

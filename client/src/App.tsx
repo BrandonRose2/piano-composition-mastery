@@ -2,6 +2,7 @@ import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import NotFound from "@/pages/NotFound";
 import { Route, Switch, useLocation } from "wouter";
+import { useEffect, useRef } from "react";
 import ErrorBoundary from "./components/ErrorBoundary";
 import { ThemeProvider } from "./contexts/ThemeContext";
 import Home from "./pages/Home";
@@ -10,12 +11,25 @@ import Landing from "./pages/Landing";
 import AutoImport from "./pages/AutoImport";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { Loader2 } from "lucide-react";
+import { LOCAL_LOGIN_PATH, shouldRedirectToLocalLogin } from "@shared/authRouting";
 
 /** Wraps protected routes — shows a loading spinner while auth resolves,
  *  then redirects to /login if the user is not authenticated. */
 function AuthGuard({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth();
-  const [, navigate] = useLocation();
+  const [location, navigate] = useLocation();
+  const hasRedirected = useRef(false);
+
+  useEffect(() => {
+    if (!shouldRedirectToLocalLogin({
+      loading,
+      hasUser: Boolean(user),
+      hasRedirected: hasRedirected.current,
+      location,
+    })) return;
+    hasRedirected.current = true;
+    navigate(LOCAL_LOGIN_PATH);
+  }, [loading, user, location, navigate]);
 
   if (loading) {
     return (
@@ -29,8 +43,7 @@ function AuthGuard({ children }: { children: React.ReactNode }) {
   }
 
   if (!user) {
-    // Redirect to landing/login page
-    navigate("/login");
+    // Redirect is scheduled by the effect above; never navigate during render.
     return null;
   }
 

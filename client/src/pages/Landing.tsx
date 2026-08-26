@@ -1,7 +1,6 @@
 import { useEffect, useState } from "react";
 import { useLocation } from "wouter";
 import { useAuth } from "@/_core/hooks/useAuth";
-import { getLoginUrl } from "@/const";
 import { trpc } from "@/lib/trpc";
 import { Music, BookOpen, Dumbbell, Calendar, Youtube, Loader2, Eye, EyeOff, User, Lock } from "lucide-react";
 
@@ -224,21 +223,6 @@ export default function Landing() {
               )}
             </p>
 
-            {/* Divider + Manus OAuth */}
-            <div className="mt-6 flex items-center gap-3">
-              <div className="flex-1 h-px bg-[oklch(0.18_0.016_265)]" />
-              <span className="text-xs text-[oklch(0.30_0.012_265)] font-mono">or</span>
-              <div className="flex-1 h-px bg-[oklch(0.18_0.016_265)]" />
-            </div>
-            <button
-              onClick={() => { window.location.href = getLoginUrl(); }}
-              className="mt-4 w-full py-3 rounded-xl bg-transparent border border-[oklch(0.22_0.016_265)]
-                text-[oklch(0.55_0.012_265)] text-sm font-mono
-                hover:border-[oklch(0.35_0.016_265)] hover:text-[oklch(0.70_0.012_265)]
-                transition-all duration-200 active:scale-[0.98]"
-            >
-              Continue with Manus account
-            </button>
           </div>
         </main>
       )}
