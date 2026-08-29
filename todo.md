@@ -194,3 +194,13 @@
 - [x] Move AuthGuard redirects out of the React render phase
 - [x] Add regression coverage for unauthenticated login-route behavior
 - [x] Diagnose and fix OAuth callback failure on the login flow
+
+## Manus Account Login Restoration
+- [x] Restore the Continue with Manus account sign-in option alongside local username/password login
+- [x] Repair the OAuth callback to exchange a valid authorization code and create a session reliably
+- [x] Verify the dual sign-in page and preserve the AuthGuard render-phase fix
+
+## Gmail-Linked Primary Sign-In
+- [x] Make Gmail-backed Manus sign-in the primary login path and retain local credentials as an alternative
+- [x] Preserve the user’s linked library ownership across Manus/Gmail identities; local accounts remain separate by design
+- [x] Ensure the existing Manus account for brandon@apartmentcorp.com can re-enter its established library

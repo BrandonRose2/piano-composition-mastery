@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useLocation } from "wouter";
 import { useAuth } from "@/_core/hooks/useAuth";
+import { getLoginUrl } from "@/const";
 import { trpc } from "@/lib/trpc";
 import { Music, BookOpen, Dumbbell, Calendar, Youtube, Loader2, Eye, EyeOff, User, Lock } from "lucide-react";
 
@@ -116,9 +117,26 @@ export default function Landing() {
               </h2>
               <p className="text-sm text-[oklch(0.50_0.012_265)]">
                 {mode === "login"
-                  ? "Sign in to access your private library"
-                  : "Pick a username and password — no email needed"}
+                  ? "Continue with your Manus / Gmail account to open your private library"
+                  : "Use your Manus / Gmail account, or create an optional local sign-in"}
               </p>
+            </div>
+
+            <button
+              type="button"
+              onClick={() => { window.location.assign(getLoginUrl()); }}
+              className="w-full py-3 rounded-xl bg-[oklch(0.78_0.12_85/0.15)] border border-[oklch(0.78_0.12_85/0.5)]
+                text-[oklch(0.90_0.06_85)] font-['Playfair_Display'] font-semibold text-base
+                hover:bg-[oklch(0.78_0.12_85/0.25)] hover:border-[oklch(0.78_0.12_85/0.8)]
+                transition-all duration-200 active:scale-[0.98]"
+            >
+              Continue with Manus / Gmail
+            </button>
+
+            <div className="mt-6 mb-5 flex items-center gap-3">
+              <div className="flex-1 h-px bg-[oklch(0.18_0.016_265)]" />
+              <span className="text-xs text-[oklch(0.38_0.012_265)] font-mono">or use a local username</span>
+              <div className="flex-1 h-px bg-[oklch(0.18_0.016_265)]" />
             </div>
 
             <form onSubmit={handleSubmit} className="space-y-4">
@@ -248,7 +266,7 @@ export default function Landing() {
 
           <div className="flex flex-col sm:flex-row items-center gap-4">
             <button
-              onClick={() => { setMode("register"); setError(""); }}
+              onClick={() => { window.location.assign(getLoginUrl()); }}
               className="group inline-flex items-center gap-3 px-8 py-4 rounded-xl
                 bg-[oklch(0.78_0.12_85/0.15)] border border-[oklch(0.78_0.12_85/0.5)]
                 text-[oklch(0.88_0.08_85)] font-['Playfair_Display'] font-semibold text-lg
@@ -256,7 +274,7 @@ export default function Landing() {
                 transition-all duration-200 active:scale-[0.97]"
             >
               <Music size={20} className="text-[oklch(0.78_0.12_85)] group-hover:scale-110 transition-transform" />
-              Get started free
+              Continue with Manus / Gmail
             </button>
             <button
               onClick={() => { setMode("login"); setError(""); }}
@@ -265,12 +283,12 @@ export default function Landing() {
                 hover:border-[oklch(0.35_0.016_265)] hover:text-[oklch(0.75_0.012_265)]
                 transition-all duration-200 active:scale-[0.97]"
             >
-              Sign in
+              Use username
             </button>
           </div>
 
           <p className="mt-4 text-xs text-[oklch(0.35_0.012_265)] font-mono">
-            No email required — just pick a username and password.
+            Your Manus account stays connected to the private piano library you already built.
           </p>
 
           {/* Feature grid */}
