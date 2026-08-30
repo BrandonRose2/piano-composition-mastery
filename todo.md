@@ -171,14 +171,14 @@
 - [x] Verify and improve the metronome’s primary entry point, start/stop audio, tempo controls, and mobile visibility
 - [x] Confirm every Find Any Piece workflow puts saved Scribd and Scribd catalog results first, free sources next, and MuseScore last
 - [x] Re-deliver the comprehensive Piano Composition Mastery Portal user guide PDF
-- [ ] Verify the metronome end-to-end in the authenticated portal, including mobile visibility and split-screen behavior
+- [x] Verify the metronome end-to-end in the authenticated portal, including mobile visibility and split-screen behavior
 - [x] Make MuseScore the true final finder bucket, with no result sources displayed after it
 
 ## Library Duplicates and Scribd Library Layout
 - [x] Identify and safely remove duplicate composition records without deleting distinct arrangements or source files
 - [x] Prevent duplicate composition imports using content fingerprints and normalized source-filename checks within the shared library
 - [x] Make My Scribd Library collapsed by default with an expandable search-and-browse panel
-- [ ] Recheck the authenticated Comet session and verify the metronome interactively
+- [x] Recheck the authenticated Comet session and verify the metronome interactively
 
 ## Composer Folder Defaults
 - [x] Load every composer folder in Your Library collapsed by default while retaining per-folder expand/collapse controls
@@ -204,3 +204,12 @@
 - [x] Make Gmail-backed Manus sign-in the primary login path and retain local credentials as an alternative
 - [x] Preserve the user’s linked library ownership across Manus/Gmail identities; local accounts remain separate by design
 - [x] Ensure the existing Manus account for brandon@apartmentcorp.com can re-enter its established library
+
+## Authenticated Library Visibility
+- [x] Trace why the Manus/Gmail session does not resolve to the established composition library
+- [x] Correct the linked identity and library-owner query so all existing compositions and Scribd documents load
+- [x] Verify the signed-in library count after the repair
+
+## Final Metronome Validation Follow-Up
+- [ ] Verify the authenticated metronome at a mobile viewport, including split-screen access
+- [ ] Confirm the connected Comet browser session presents the same authenticated metronome behavior

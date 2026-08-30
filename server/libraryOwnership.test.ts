@@ -4,12 +4,12 @@ import { practiceProgress } from "../drizzle/schema";
 import { getDb, getProgressForComposition, listCompositions, resolveLibraryOwnerId } from "./db";
 
 describe("linked library ownership", () => {
-  it("resolves Brandon Rose's linked Google identity to the active email library", async () => {
+  it("resolves Brandon Rose's Manus/email identity to the canonical Gmail-backed library", async () => {
     const emailOwner = await resolveLibraryOwnerId(1);
     const googleOwner = await resolveLibraryOwnerId(2940001);
 
-    expect(emailOwner).toBe(1);
-    expect(googleOwner).toBe(emailOwner);
+    expect(emailOwner).toBe(2940001);
+    expect(googleOwner).toBe(2940001);
 
     const emailLibrary = await listCompositions(emailOwner);
     const googleLibrary = await listCompositions(googleOwner);
