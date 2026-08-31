@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { MAX_BPM, MIN_BPM, normalizeTempo, parseTempoDraft } from "@shared/metronomeTempo";
 
 const TIME_SIGNATURES = [
   { label: "2/4", beats: 2 },
@@ -24,6 +25,7 @@ function getTempoMark(bpm: number) {
 
 export default function Metronome() {
   const [bpm, setBpm] = useState(80);
+  const [tempoDraft, setTempoDraft] = useState("80");
   const [isPlaying, setIsPlaying] = useState(false);
   const [timeSig, setTimeSig] = useState(4);
   const [currentBeat, setCurrentBeat] = useState(0);
@@ -143,9 +145,7 @@ export default function Metronome() {
         const intervals = recent.slice(1).map((t, i) => t - recent[i]);
         const avg = intervals.reduce((a, b) => a + b, 0) / intervals.length;
         const newBpm = Math.round(60000 / avg);
-        const clamped = Math.min(220, Math.max(20, newBpm));
-        setBpm(clamped);
-        setTimeout(restartIfPlaying, 0);
+        commitTempoChange(newBpm);
       }
       return recent;
     });
@@ -159,9 +159,33 @@ export default function Metronome() {
     };
   }, []);
 
-  const handleBpmChange = (val: number) => {
-    setBpm(val);
+  const commitTempoChange = useCallback((value: number) => {
+    const normalized = normalizeTempo(value);
+    bpmRef.current = normalized;
+    setBpm(normalized);
+    setTempoDraft(String(normalized));
     setTimeout(restartIfPlaying, 0);
+  }, [restartIfPlaying]);
+
+  const handleSliderInput = (value: number) => {
+    const normalized = normalizeTempo(value);
+    // While dragging, the display stays responsive but an active pulse is not
+    // restarted on every pixel. The new tempo is committed on release.
+    setBpm(normalized);
+    setTempoDraft(String(normalized));
+  };
+
+  const commitSliderTempo = (value: number) => {
+    commitTempoChange(value);
+  };
+
+  const commitTempoDraft = () => {
+    const parsed = parseTempoDraft(tempoDraft);
+    if (parsed === null) {
+      setTempoDraft(String(bpm));
+      return;
+    }
+    commitTempoChange(parsed);
   };
 
   const handleTimeSigChange = (beats: number) => {
@@ -196,6 +220,29 @@ export default function Metronome() {
         <span className="metro-tempo-mark">{tempoMark}</span>
       </div>
 
+      <div className="mt-2 flex items-center justify-center gap-2">
+        <label htmlFor="metronome-tempo-input" className="text-[0.62rem] uppercase tracking-[0.14em] text-[oklch(0.55_0.018_265)]">
+          Set tempo
+        </label>
+        <input
+          id="metronome-tempo-input"
+          type="number"
+          inputMode="numeric"
+          min={MIN_BPM}
+          max={MAX_BPM}
+          value={tempoDraft}
+          onChange={(event) => setTempoDraft(event.target.value)}
+          onBlur={commitTempoDraft}
+          onKeyDown={(event) => {
+            if (event.key === "Enter") {
+              event.currentTarget.blur();
+            }
+          }}
+          className="w-16 rounded-md border border-[oklch(0.30_0.018_265)] bg-[oklch(0.13_0.012_265)] px-2 py-1 text-center font-mono text-sm text-[oklch(0.88_0.01_85)] outline-none transition-colors focus:border-[oklch(0.78_0.12_85)] focus:ring-1 focus:ring-[oklch(0.78_0.12_85/0.45)]"
+          aria-label="Set tempo in beats per minute"
+        />
+      </div>
+
       {/* Beat Indicators */}
       <div className="metro-beats">
         {Array.from({ length: timeSig }).map((_, i) => (
@@ -208,17 +255,25 @@ export default function Metronome() {
 
       {/* BPM Slider */}
       <div className="metro-slider-row">
-        <span className="metro-slider-label">20</span>
+        <span className="metro-slider-label">{MIN_BPM}</span>
         <input
           type="range"
-          min={20}
-          max={220}
+          min={MIN_BPM}
+          max={MAX_BPM}
+          step={1}
           value={bpm}
-          onChange={(e) => handleBpmChange(Number(e.target.value))}
+          onChange={(event) => handleSliderInput(Number(event.target.value))}
+          onPointerUp={(event) => commitSliderTempo(Number(event.currentTarget.value))}
+          onKeyUp={(event) => {
+            if (["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown", "Home", "End", "PageUp", "PageDown"].includes(event.key)) {
+              commitSliderTempo(Number(event.currentTarget.value));
+            }
+          }}
+          onBlur={(event) => commitSliderTempo(Number(event.currentTarget.value))}
           className="metro-slider"
           aria-label="Tempo in beats per minute"
         />
-        <span className="metro-slider-label">220</span>
+        <span className="metro-slider-label">{MAX_BPM}</span>
       </div>
 
       {/* BPM Quick Buttons */}
@@ -227,7 +282,7 @@ export default function Metronome() {
           <button
             key={delta}
             className="metro-quick-btn"
-            onClick={() => handleBpmChange(Math.min(220, Math.max(20, bpm + delta)))}
+            onClick={() => commitTempoChange(bpm + delta)}
           >
             {delta > 0 ? `+${delta}` : delta}
           </button>
@@ -280,7 +335,7 @@ export default function Metronome() {
           <button
             key={t.label}
             className={`metro-ref-btn ${bpm >= t.min && bpm <= t.max ? "metro-ref-active" : ""}`}
-            onClick={() => handleBpmChange(Math.round((t.min + t.max) / 2))}
+            onClick={() => commitTempoChange(Math.round((t.min + t.max) / 2))}
             title={`${t.min}–${t.max} BPM`}
           >
             {t.label}

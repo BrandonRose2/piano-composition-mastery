@@ -213,3 +213,10 @@
 ## Final Metronome Validation Follow-Up
 - [ ] Verify the authenticated metronome at a mobile viewport, including split-screen access
 - [ ] Confirm the connected Comet browser session presents the same authenticated metronome behavior
+
+## Metronome Tempo Control and Predictive Library Search
+- [x] Make the metronome tempo slider less sensitive for larger BPM changes while retaining precise 1-BPM control
+- [x] Add a direct BPM number field for fast, deliberate tempo entry
+- [x] Add predictive library search across score title, composer, folder, and file name
+- [x] Filter composer folders and piece counts live as the library search text changes
+- [x] Add tests for tempo normalization and predictive search matching

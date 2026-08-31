@@ -1,6 +1,7 @@
-import { useState, useMemo } from "react";
-import { Folder, ChevronRight, ChevronDown, BookOpen, Loader2, GripVertical } from "lucide-react";
+import { useState, useMemo, useRef } from "react";
+import { Folder, ChevronRight, ChevronDown, BookOpen, Loader2, GripVertical, Search, X } from "lucide-react";
 import { groupCompositionsByComposer, resolveComposerFolder } from "@shared/composerFolders";
+import { compositionMatchesSearch, getLibrarySearchSuggestions } from "@shared/librarySearch";
 
 // Forward-declare types to avoid circular imports
 type ProgressSummary = { completedDays: number; totalDays: number; percentage: number };
@@ -19,8 +20,21 @@ export function ComposerFolderLibrary({ compositions, progressMap, isLoading, re
   const [draggedComposition, setDraggedComposition] = useState<any | null>(null);
   const [activeDropComposer, setActiveDropComposer] = useState<string | null>(null);
   const [movingCompositionId, setMovingCompositionId] = useState<number | null>(null);
+  const [searchQuery, setSearchQuery] = useState("");
+  const searchInputRef = useRef<HTMLInputElement>(null);
 
-  const grouped: [string, any[]][] = useMemo(() => groupCompositionsByComposer(compositions), [compositions]);
+  const matchingCompositions = useMemo(
+    () => compositions.filter((composition) => compositionMatchesSearch(composition, searchQuery)),
+    [compositions, searchQuery],
+  );
+  const grouped: [string, any[]][] = useMemo(
+    () => groupCompositionsByComposer(matchingCompositions),
+    [matchingCompositions],
+  );
+  const suggestions = useMemo(
+    () => getLibrarySearchSuggestions(compositions, searchQuery),
+    [compositions, searchQuery],
+  );
 
   const toggleFolder = (composer: string) => {
     setOpenFolders(prev => ({ ...prev, [composer]: !(prev[composer] ?? false) }));
@@ -39,6 +53,15 @@ export function ComposerFolderLibrary({ compositions, progressMap, isLoading, re
       setActiveDropComposer(null);
       setDraggedComposition(null);
     }
+  };
+
+  const selectSuggestion = (composition: any) => {
+    const composer = resolveComposerFolder(composition);
+    setOpenFolders((previous) => ({ ...previous, [composer]: true }));
+    setSearchQuery("");
+    window.requestAnimationFrame(() => {
+      document.getElementById(`composition-${composition.id}`)?.scrollIntoView({ behavior: "smooth", block: "center" });
+    });
   };
 
   if (isLoading) {
@@ -66,6 +89,58 @@ export function ComposerFolderLibrary({ compositions, progressMap, isLoading, re
           <p className="px-1 text-[0.65rem] font-mono text-[oklch(0.44_0.012_265)]">
             Drag a score card onto another composer folder to file it there. Use the <span className="text-[oklch(0.68_0.08_85)]">Move to</span> menu beneath a score if you prefer.
           </p>
+          <div className="relative mt-3">
+            <label htmlFor="library-search" className="sr-only">Search your composition library</label>
+            <Search aria-hidden="true" size={16} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[oklch(0.62_0.05_85)]" />
+            <input
+              id="library-search"
+              ref={searchInputRef}
+              value={searchQuery}
+              onChange={(event) => setSearchQuery(event.target.value)}
+              placeholder="Search your library by title, composer, folder, or file name…"
+              className="w-full rounded-xl border border-[oklch(0.28_0.018_265)] bg-[oklch(0.14_0.012_265)] py-2.5 pl-10 pr-10 text-sm text-[oklch(0.88_0.01_85)] placeholder:text-[oklch(0.45_0.012_265)] outline-none transition-colors focus:border-[oklch(0.78_0.12_85)] focus:ring-2 focus:ring-[oklch(0.78_0.12_85/0.16)]"
+              aria-describedby="library-search-status"
+            />
+            {searchQuery && (
+              <button
+                type="button"
+                onClick={() => {
+                  setSearchQuery("");
+                  searchInputRef.current?.focus();
+                }}
+                className="absolute right-2 top-1/2 -translate-y-1/2 rounded-md p-1.5 text-[oklch(0.55_0.012_265)] transition-colors hover:bg-white/5 hover:text-[oklch(0.88_0.01_85)] focus:outline-none focus:ring-1 focus:ring-[oklch(0.78_0.12_85)]"
+                aria-label="Clear library search"
+              >
+                <X size={15} />
+              </button>
+            )}
+            <p id="library-search-status" role="status" className="mt-1.5 px-1 text-[0.62rem] font-mono text-[oklch(0.48_0.014_265)]">
+              {searchQuery ? `${matchingCompositions.length} of ${compositions.length} pieces match` : `${compositions.length} pieces in your library`}
+            </p>
+            {searchQuery && suggestions.length > 0 && (
+              <div className="mt-2 overflow-hidden rounded-lg border border-[oklch(0.28_0.018_265)] bg-[oklch(0.12_0.012_265)] shadow-lg">
+                <p className="px-3 pt-2 text-[0.58rem] font-mono uppercase tracking-[0.12em] text-[oklch(0.52_0.045_85)]">Top matches</p>
+                {suggestions.map((composition) => (
+                  <button
+                    key={composition.id}
+                    type="button"
+                    onClick={() => selectSuggestion(composition)}
+                    className="flex w-full items-center gap-3 px-3 py-2.5 text-left transition-colors hover:bg-[oklch(0.18_0.016_265)] focus:bg-[oklch(0.18_0.016_265)] focus:outline-none"
+                  >
+                    <BookOpen size={14} className="shrink-0 text-[oklch(0.72_0.09_85)]" aria-hidden="true" />
+                    <span className="min-w-0 flex-1 truncate text-sm text-[oklch(0.86_0.012_85)]">{composition.title}</span>
+                    <span className="max-w-[38%] truncate text-[0.65rem] font-mono text-[oklch(0.52_0.014_265)]">{resolveComposerFolder(composition)}</span>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+          {searchQuery && matchingCompositions.length === 0 && (
+            <div className="mt-3 rounded-xl border border-dashed border-[oklch(0.30_0.018_265)] p-5 text-center">
+              <p className="text-sm text-[oklch(0.70_0.014_265)]">No compositions match “{searchQuery}”.</p>
+              <p className="mt-1 text-xs text-[oklch(0.45_0.012_265)]">Try a title, composer, folder name, or part of the original file name.</p>
+            </div>
+          )}
           {grouped.map(([composer, comps]) => {
           const open = isFolderOpen(composer);
           const isUncategorized = composer === "Uncategorized";
@@ -134,6 +209,7 @@ export function ComposerFolderLibrary({ compositions, progressMap, isLoading, re
                   {comps.map((comp: any) => (
                     <div
                       key={comp.id}
+                      id={`composition-${comp.id}`}
                       draggable={movingCompositionId === null}
                       onDragStart={(event) => {
                         event.dataTransfer.effectAllowed = "move";
