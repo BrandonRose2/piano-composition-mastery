@@ -211,8 +211,18 @@
 - [x] Verify the signed-in library count after the repair
 
 ## Final Metronome Validation Follow-Up
-- [ ] Verify the authenticated metronome at a mobile viewport, including split-screen access
-- [ ] Confirm the connected Comet browser session presents the same authenticated metronome behavior
+- [x] Record the user-confirmed initial mobile or Comet tempo-control check
+
+## Final Metronome Verification Detail
+- [x] Confirm mobile split-screen metronome visibility and access from a user-provided iPhone capture
+- [ ] Verify authenticated mobile Start/Stop/Test Sound behavior after opening the split-screen metronome
+- [ ] Confirm the same authenticated metronome behavior specifically in the connected Comet browser session
+
+## iPhone Split-Screen and Score Zoom Repair
+- [x] Replace the cramped dual-column iPhone split-screen view with a usable score and practice-panel layout
+- [x] Fix the score zoom-in control so it visibly enlarges sheet music on iPhone
+- [x] Prevent the zoom percentage and zoom buttons from overlapping at phone widths
+- [ ] Verify the repaired layout and zoom controls at an iPhone-sized viewport
 
 ## Metronome Tempo Control and Predictive Library Search
 - [x] Make the metronome tempo slider less sensitive for larger BPM changes while retaining precise 1-BPM control

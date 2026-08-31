@@ -3,6 +3,14 @@ import {
   ZoomIn, ZoomOut, ChevronLeft, ChevronRight, Maximize2, Minimize2,
   Loader2, AlertCircle, Download, RotateCw, Printer
 } from "lucide-react";
+import {
+  adjustScoreZoom,
+  MAX_IMAGE_SCORE_ZOOM,
+  MAX_PDF_SCORE_ZOOM,
+  MIN_SCORE_ZOOM,
+  SCORE_ZOOM_STEP,
+  scoreZoomWidthPercent,
+} from "@shared/scoreZoom";
 
 // ── Types ────────────────────────────────────────────────────────────────────
 interface ScoreViewerProps {
@@ -15,7 +23,7 @@ interface ScoreViewerProps {
 function PdfViewer({ fileUrl, title }: { fileUrl: string; title?: string }) {
   const [pages, setPages] = useState<number>(0);
   const [currentPage, setCurrentPage] = useState(1);
-  const [scale, setScale] = useState(1.4);
+  const [scale, setScale] = useState(1);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [fullscreen, setFullscreen] = useState(false);
@@ -95,8 +103,8 @@ function PdfViewer({ fileUrl, title }: { fileUrl: string; title?: string }) {
     return () => { cancelled = true; };
   }, [currentPage, scale, pages]);
 
-  const zoomIn = () => setScale(s => Math.min(s + 0.2, 3.0));
-  const zoomOut = () => setScale(s => Math.max(s - 0.2, 0.6));
+  const zoomIn = () => setScale((current) => adjustScoreZoom(current, SCORE_ZOOM_STEP, MAX_PDF_SCORE_ZOOM));
+  const zoomOut = () => setScale((current) => adjustScoreZoom(current, -SCORE_ZOOM_STEP, MAX_PDF_SCORE_ZOOM));
   const prevPage = () => setCurrentPage(p => Math.max(p - 1, 1));
   const nextPage = () => setCurrentPage(p => Math.min(p + 1, pages));
 
@@ -145,14 +153,14 @@ function PdfViewer({ fileUrl, title }: { fileUrl: string; title?: string }) {
       className={`flex flex-col ${fullscreen ? "bg-[oklch(0.10_0.016_265)] h-screen" : ""}`}
     >
       {/* Toolbar */}
-      <div className="flex items-center justify-between px-4 py-2 border-b border-[oklch(0.22_0.016_265)] bg-[oklch(0.13_0.018_265)] sticky top-0 z-10">
+      <div className="flex flex-wrap items-center gap-y-1 px-2 py-2 sm:flex-nowrap sm:justify-between sm:px-4 border-b border-[oklch(0.22_0.016_265)] bg-[oklch(0.13_0.018_265)] sticky top-0 z-10">
         {/* Page navigation */}
         <div className="flex items-center gap-2">
           <button onClick={prevPage} disabled={currentPage <= 1}
             className="p-1.5 rounded hover:bg-[oklch(0.22_0.016_265)] disabled:opacity-30 transition-colors text-[oklch(0.65_0.015_265)]">
             <ChevronLeft size={16} />
           </button>
-          <span className="font-mono text-xs text-[oklch(0.55_0.012_265)] min-w-[5rem] text-center">
+          <span className="font-mono text-xs text-[oklch(0.55_0.012_265)] min-w-[3.75rem] whitespace-nowrap text-center">
             {currentPage} / {pages}
           </span>
           <button onClick={nextPage} disabled={currentPage >= pages}
@@ -167,15 +175,15 @@ function PdfViewer({ fileUrl, title }: { fileUrl: string; title?: string }) {
         </span>
 
         {/* Zoom + fullscreen */}
-        <div className="flex items-center gap-1">
-          <button onClick={zoomOut} disabled={scale <= 0.6}
+        <div className="ml-auto flex items-center gap-1 sm:ml-0">
+          <button onClick={zoomOut} disabled={scale <= MIN_SCORE_ZOOM}
             className="p-1.5 rounded hover:bg-[oklch(0.22_0.016_265)] disabled:opacity-30 transition-colors text-[oklch(0.65_0.015_265)]">
             <ZoomOut size={15} />
           </button>
-          <span className="font-mono text-[0.65rem] text-[oklch(0.50_0.012_265)] w-10 text-center">
+          <span className="font-mono text-[0.65rem] text-[oklch(0.50_0.012_265)] w-10 shrink-0 whitespace-nowrap text-center">
             {Math.round(scale * 100)}%
           </span>
-          <button onClick={zoomIn} disabled={scale >= 3.0}
+          <button onClick={zoomIn} disabled={scale >= MAX_PDF_SCORE_ZOOM}
             className="p-1.5 rounded hover:bg-[oklch(0.22_0.016_265)] disabled:opacity-30 transition-colors text-[oklch(0.65_0.015_265)]">
             <ZoomIn size={15} />
           </button>
@@ -208,7 +216,7 @@ function PdfViewer({ fileUrl, title }: { fileUrl: string; title?: string }) {
           <canvas
             ref={canvasRef}
             className="shadow-2xl shadow-black/60 rounded"
-            style={{ maxWidth: "100%", height: "auto" }}
+            style={{ width: scoreZoomWidthPercent(scale), maxWidth: "none", height: "auto" }}
           />
         </div>
       </div>
@@ -255,19 +263,19 @@ function ImageViewer({ fileUrl, title }: { fileUrl: string; title?: string }) {
   return (
     <div ref={containerRef} className={`flex flex-col ${fullscreen ? "bg-[oklch(0.10_0.016_265)] h-screen" : ""}`}>
       {/* Toolbar */}
-      <div className="flex items-center justify-between px-4 py-2 border-b border-[oklch(0.22_0.016_265)] bg-[oklch(0.13_0.018_265)] sticky top-0 z-10">
+      <div className="flex flex-wrap items-center gap-y-1 px-2 py-2 sm:flex-nowrap sm:justify-between sm:px-4 border-b border-[oklch(0.22_0.016_265)] bg-[oklch(0.13_0.018_265)] sticky top-0 z-10">
         <span className="font-['Playfair_Display'] text-sm text-[oklch(0.78_0.12_85)] truncate max-w-xs">
           {title ?? "Score"}
         </span>
-        <div className="flex items-center gap-1">
-          <button onClick={() => setScale(s => Math.max(s - 0.2, 0.4))}
+        <div className="ml-auto flex items-center gap-1 sm:ml-0">
+          <button onClick={() => setScale((current) => adjustScoreZoom(current, -SCORE_ZOOM_STEP, MAX_IMAGE_SCORE_ZOOM))} disabled={scale <= MIN_SCORE_ZOOM}
             className="p-1.5 rounded hover:bg-[oklch(0.22_0.016_265)] transition-colors text-[oklch(0.65_0.015_265)]">
             <ZoomOut size={15} />
           </button>
-          <span className="font-mono text-[0.65rem] text-[oklch(0.50_0.012_265)] w-10 text-center">
+          <span className="font-mono text-[0.65rem] text-[oklch(0.50_0.012_265)] w-10 shrink-0 whitespace-nowrap text-center">
             {Math.round(scale * 100)}%
           </span>
-          <button onClick={() => setScale(s => Math.min(s + 0.2, 4.0))}
+          <button onClick={() => setScale((current) => adjustScoreZoom(current, SCORE_ZOOM_STEP, MAX_IMAGE_SCORE_ZOOM))} disabled={scale >= MAX_IMAGE_SCORE_ZOOM}
             className="p-1.5 rounded hover:bg-[oklch(0.22_0.016_265)] transition-colors text-[oklch(0.65_0.015_265)]">
             <ZoomIn size={15} />
           </button>
@@ -325,9 +333,10 @@ function ImageViewer({ fileUrl, title }: { fileUrl: string; title?: string }) {
             className="shadow-2xl shadow-black/60 rounded transition-transform duration-200"
             style={{
               display: error ? "none" : "block",
-              transform: `scale(${scale}) rotate(${rotation}deg)`,
+              transform: `rotate(${rotation}deg)`,
               transformOrigin: "top center",
-              maxWidth: `${100 / scale}%`,
+              width: scoreZoomWidthPercent(scale),
+              maxWidth: "none",
             }}
           />
         </div>

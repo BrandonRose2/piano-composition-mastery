@@ -17,6 +17,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { format, addDays } from "date-fns";
 import ScoreViewer from "@/components/ScoreViewer";
 import Metronome from "@/components/Metronome";
+import { useIsMobile } from "@/hooks/useMobile";
 
 // IMSLP public-domain PDF for La Campanella S.141/3 (redirects to a direct PDF)
 const LC_SCORE_URL = "https://imslp.org/wiki/Special:ReverseLookup/02085";
@@ -669,6 +670,7 @@ function DayCard({ day, focus, goal, completed, onToggle, dateLabel }: {
 export default function CompositionDetail() {
   const params = useParams<{ id: string }>();
   const [, navigate] = useLocation();
+  const isMobile = useIsMobile();
   const isBuiltIn = params.id === "la-campanella";
 
   // For built-in: use localStorage; for uploaded: use DB
@@ -964,29 +966,29 @@ export default function CompositionDetail() {
       {splitScreen && hasScore && scoreUrl && (
         <div className="fixed inset-0 top-0 z-50 bg-[oklch(0.10_0.016_265)] flex flex-col" style={{ paddingTop: 0 }}>
           {/* Split-screen top bar */}
-          <div className="flex items-center justify-between px-4 py-2 border-b border-[oklch(0.22_0.016_265)] bg-[oklch(0.13_0.018_265)] shrink-0">
-            <div className="flex items-center gap-3">
-              <img src={LOGO_TREBLE} alt="" className="h-5 w-auto" />
-              <span className="font-['Playfair_Display'] text-sm text-[oklch(0.78_0.12_85)]">{analysis.title}</span>
-              <span className="text-[oklch(0.35_0.014_265)] text-xs font-mono">·</span>
-              <span className="text-[oklch(0.68_0.012_265)] text-xs font-mono">Split Practice Mode</span>
+          <div className="flex items-center gap-2 px-3 py-2 sm:px-4 border-b border-[oklch(0.22_0.016_265)] bg-[oklch(0.13_0.018_265)] shrink-0">
+            <div className="flex min-w-0 flex-1 items-center gap-2 sm:gap-3">
+              <img src={LOGO_TREBLE} alt="" className="hidden h-5 w-auto sm:block" />
+              <span className="truncate font-['Playfair_Display'] text-sm text-[oklch(0.78_0.12_85)]">{analysis.title}</span>
+              <span className="hidden text-[oklch(0.35_0.014_265)] text-xs font-mono sm:inline">·</span>
+              <span className="hidden text-[oklch(0.68_0.012_265)] text-xs font-mono sm:inline">Split Practice Mode</span>
             </div>
-            <div className="flex items-center gap-3">
-              <span className="font-mono text-xs text-[oklch(0.78_0.12_85)]">{overallPct}% complete</span>
+            <div className="flex shrink-0 items-center gap-2 sm:gap-3">
+              <span className="hidden font-mono text-xs text-[oklch(0.78_0.12_85)] sm:inline">{overallPct}% complete</span>
               <button
                 onClick={() => setSplitScreen(false)}
-                className="flex items-center gap-2 px-3 py-1.5 rounded text-xs font-mono border border-[oklch(0.30_0.018_265)] text-[oklch(0.72_0.015_265)] hover:border-[oklch(0.78_0.12_85/0.5)] hover:text-[oklch(0.78_0.12_85)] transition-all"
+                className="flex items-center gap-1.5 px-2.5 py-1.5 rounded text-xs font-mono border border-[oklch(0.30_0.018_265)] text-[oklch(0.72_0.015_265)] hover:border-[oklch(0.78_0.12_85/0.5)] hover:text-[oklch(0.78_0.12_85)] transition-all"
               >
-                <PanelLeftClose size={12} /> Exit Split
+                <PanelLeftClose size={12} /> <span className="sm:hidden">Exit</span><span className="hidden sm:inline">Exit Split</span>
               </button>
             </div>
           </div>
 
-          {/* Resizable panels */}
-          <ResizablePanelGroup direction="horizontal" className="flex-1 min-h-0">
+          {/* Desktop stays side-by-side; phone screens stack the score over the tracker. */}
+          <ResizablePanelGroup direction={isMobile ? "vertical" : "horizontal"} className="flex-1 min-h-0">
             {/* Left: Score */}
-            <ResizablePanel defaultSize={55} minSize={30}>
-              <div className="h-full overflow-auto bg-[oklch(0.11_0.016_265)] flex items-center justify-center p-8">
+            <ResizablePanel defaultSize={isMobile ? 58 : 55} minSize={isMobile ? 35 : 30}>
+              <div className="h-full min-w-0 overflow-auto bg-[oklch(0.11_0.016_265)] flex items-center justify-center p-3 sm:p-8">
                 {isBuiltIn ? (
                   <div className="nocturne-card p-8 max-w-md w-full text-center">
                     <FileMusic size={40} className="text-[oklch(0.78_0.12_85)] mx-auto mb-4" />
@@ -1014,12 +1016,12 @@ export default function CompositionDetail() {
             {/* Divider */}
             <ResizableHandle
               withHandle
-              className="w-1.5 bg-[oklch(0.20_0.016_265)] hover:bg-[oklch(0.78_0.12_85/0.3)] transition-colors data-[resize-handle-active]:bg-[oklch(0.78_0.12_85/0.5)]"
+              className="w-1.5 bg-[oklch(0.20_0.016_265)] hover:bg-[oklch(0.78_0.12_85/0.3)] transition-colors data-[resize-handle-active]:bg-[oklch(0.78_0.12_85/0.5)] data-[panel-group-direction=vertical]:h-2"
             />
 
             {/* Right: Tracker */}
-            <ResizablePanel defaultSize={45} minSize={28}>
-              <div className="h-full overflow-y-auto bg-[oklch(0.12_0.018_265)] px-5 py-6">
+            <ResizablePanel defaultSize={isMobile ? 42 : 45} minSize={isMobile ? 30 : 28}>
+              <div className="h-full min-w-0 overflow-y-auto bg-[oklch(0.12_0.018_265)] px-3 py-4 sm:px-5 sm:py-6">
                 {/* Mini header */}
                 <div className="flex items-center justify-between mb-5">
                   <div>

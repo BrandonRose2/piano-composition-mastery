@@ -23,3 +23,5 @@ The authenticated Start control transitioned to Stop and showed the running stat
 The authenticated composition page exposes both Split Screen and Score + Video actions alongside the Practice Metronome. Split Screen successfully opened its dedicated score-and-practice-tracker workspace, including the visible vertical METRONOME control at the right edge.
 
 Within the authenticated split-screen workspace, the vertical METRONOME control opened the complete metronome panel beside the score and tracker. This confirms the metronome remains directly usable during score-and-practice split-screen work.
+
+User-provided iPhone capture on 2026-08-31 confirms that the authenticated split-screen workspace remains legible at phone width and the vertical METRONOME entry control is visible and reachable beside the practice tracker.
