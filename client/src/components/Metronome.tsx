@@ -271,6 +271,7 @@ export default function Metronome() {
           }}
           onBlur={(event) => commitSliderTempo(Number(event.currentTarget.value))}
           className="metro-slider"
+          style={{ backgroundSize: `${((bpm - MIN_BPM) / (MAX_BPM - MIN_BPM)) * 100}% 3px` }}
           aria-label="Tempo in beats per minute"
         />
         <span className="metro-slider-label">{MAX_BPM}</span>

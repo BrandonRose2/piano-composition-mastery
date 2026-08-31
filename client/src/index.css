@@ -328,19 +328,27 @@
   flex: 1;
   -webkit-appearance: none;
   appearance: none;
-  height: 3px;
+  height: 1.75rem;
+  min-height: 2.75rem;
   border-radius: 2px;
   background: linear-gradient(to right, oklch(0.78 0.12 85), oklch(0.78 0.12 85)) no-repeat,
               oklch(0.24 0.016 265);
-  background-size: 50% 100%;
+  background-size: 50% 3px;
+  background-position: center;
   outline: none;
   cursor: pointer;
+  touch-action: pan-y;
+}
+
+.metro-slider::-webkit-slider-runnable-track {
+  height: 3px;
+  border-radius: 2px;
 }
 
 .metro-slider::-webkit-slider-thumb {
   -webkit-appearance: none;
-  width: 14px;
-  height: 14px;
+  width: 20px;
+  height: 20px;
   border-radius: 50%;
   background: oklch(0.78 0.12 85);
   border: 2px solid oklch(0.14 0.018 265);
@@ -377,6 +385,23 @@
   background: oklch(0.78 0.12 85 / 0.15);
   border-color: oklch(0.78 0.12 85 / 0.40);
   color: oklch(0.78 0.12 85);
+}
+
+@media (max-width: 480px) {
+  .metronome-widget {
+    gap: 0.55rem;
+  }
+
+  .metro-quick-btn,
+  .metro-timesig-btn {
+    min-height: 2.25rem;
+    min-width: 2.5rem;
+  }
+
+  .metro-tap-btn,
+  .metro-play-btn {
+    min-height: 2.75rem;
+  }
 }
 
 .metro-timesig-row {
