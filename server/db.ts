@@ -116,7 +116,7 @@ export async function createComposition(data: InsertComposition) {
   return rows[0];
 }
 
-function normalizeCompositionFilename(value: string | null | undefined): string {
+export function normalizeCompositionFilename(value: string | null | undefined): string {
   return (value ?? "")
     .replace(/\.[^.]+$/, "")
     .replace(/^\d{5,}[\s._-]*/, "")

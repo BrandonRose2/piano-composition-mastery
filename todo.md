@@ -224,6 +224,13 @@
 - [x] Prevent the zoom percentage and zoom buttons from overlapping at phone widths
 - [ ] Verify the repaired layout and zoom controls at an iPhone-sized viewport
 
+## YouTube-to-PDF Acquisition and Library Import
+- [x] Reproduce the finder flow using the supplied James Malikey YouTube link and confirm the identified work
+- [x] Distinguish searchable sheet-music results from legally importable, verified PDF sources
+- [x] Add an acquisition step that imports an available PDF directly into the user’s library
+- [x] Check the user’s cached Scribd library before public sources and retain source attribution
+- [x] Add tests for source selection and PDF import eligibility
+
 ## Metronome Tempo Control and Predictive Library Search
 - [x] Make the metronome tempo slider less sensitive for larger BPM changes while retaining precise 1-BPM control
 - [x] Add a direct BPM number field for fast, deliberate tempo entry

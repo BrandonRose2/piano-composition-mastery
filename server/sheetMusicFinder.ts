@@ -11,11 +11,12 @@
 
 import { invokeLLM } from "./_core/llm";
 import { callDataApi } from "./_core/dataApi";
+import { isAuthorizedOpenScorePdfUrl } from "@shared/sheetMusicAcquisition";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
 export interface SheetMusicResult {
-  source: "scribd" | "youtube_description" | "youtube_comments" | "imslp" | "mutopia" | "musopen" | "free_scores" | "musescore" | "web";
+  source: "scribd" | "youtube_description" | "youtube_comments" | "imslp" | "mutopia" | "musopen" | "free_scores" | "public_pdf" | "musescore" | "web";
   title: string;
   url: string;
   pdfUrl?: string;           // direct PDF download URL if available
@@ -41,6 +42,7 @@ const SOURCE_PRIORITY: Record<SheetMusicResult["source"], number> = {
   mutopia: 21,
   musopen: 22,
   free_scores: 23,
+  public_pdf: 24,
   youtube_description: 30,
   youtube_comments: 31,
   // Subscription-only sources share the one final fallback bucket.
@@ -165,7 +167,7 @@ export function extractVideoId(url: string): string | null {
   return null;
 }
 
-/** Fetch YouTube video metadata via the Data API */
+/** Fetch YouTube video metadata via the Data API, then public oEmbed as a reliable fallback. */
 async function getVideoMetadata(videoId: string): Promise<{
   title: string;
   description: string;
@@ -184,8 +186,44 @@ async function getVideoMetadata(videoId: string): Promise<{
     if (!title) return null;
     return { title, description, channelTitle };
   } catch (err) {
-    console.error("[SheetFinder] Failed to get video metadata:", err);
+    console.warn("[SheetFinder] Data API metadata unavailable; trying YouTube oEmbed:", err instanceof Error ? err.message : err);
+  }
+
+  try {
+    const watchUrl = `https://www.youtube.com/watch?v=${videoId}`;
+    const response = await fetch(`https://www.youtube.com/oembed?url=${encodeURIComponent(watchUrl)}&format=json`, {
+      headers: { "User-Agent": "Mozilla/5.0 (compatible; PianoMasteryPortal/1.0)" },
+      signal: AbortSignal.timeout(8_000),
+    });
+    if (!response.ok) return null;
+    const data = await response.json() as { title?: string; author_name?: string };
+    if (!data.title) return null;
+    return {
+      title: data.title,
+      description: await getPublicYouTubeDescription(videoId),
+      channelTitle: data.author_name ?? "",
+    };
+  } catch (err) {
+    console.error("[SheetFinder] YouTube oEmbed metadata failed:", err instanceof Error ? err.message : err);
     return null;
+  }
+}
+
+/** Extract a publicly rendered video description only as a fallback to the unavailable data service. */
+async function getPublicYouTubeDescription(videoId: string): Promise<string> {
+  try {
+    const response = await fetch(`https://www.youtube.com/watch?v=${videoId}`, {
+      headers: { "User-Agent": "Mozilla/5.0 (compatible; PianoMasteryPortal/1.0)" },
+      signal: AbortSignal.timeout(10_000),
+    });
+    if (!response.ok) return "";
+    const html = await response.text();
+    const match = html.match(/"shortDescription":"((?:\\.|[^"\\])*)"/);
+    if (!match?.[1]) return "";
+    return JSON.parse(`"${match[1]}"`) as string;
+  } catch (error) {
+    console.warn("[SheetFinder] Public YouTube description unavailable:", error instanceof Error ? error.message : error);
+    return "";
   }
 }
 
@@ -340,8 +378,9 @@ async function runPrioritizedSourceSearch(
   // Intentional sequence: public/community searches wait until Scribd was checked.
   const scribdResults = await searchScribdFirst(compositionName, composer, scribdSessionCookie);
 
-  const [imslpResults, youtubeResults] = await Promise.all([
+  const [imslpResults, publicPdfResults, youtubeResults] = await Promise.all([
     searchImslp(compositionName, composer),
+    searchAuthorizedPublicPdfs(compositionName, composer),
     youtube ? scanYouTubeLinks(youtube.videoId, youtube.description) : Promise.resolve([]),
   ]);
   const freeCatalogResults = searchFreeCatalogs(compositionName, composer);
@@ -354,11 +393,85 @@ async function runPrioritizedSourceSearch(
       ...scribdResults,
       ...imslpResults,
       ...freeCatalogResults,
+      ...publicPdfResults,
       ...youtubeResults,
       ...musescoreResults,
     ]),
     sourceSearchOrder: searchOrderFor(!!youtube),
   };
+}
+
+/**
+ * Search only established open-score hosts for a direct PDF. A result becomes
+ * importable only when the full URL is a direct PDF on an authorized host.
+ */
+async function searchAuthorizedPublicPdfs(
+  compositionName: string,
+  composer: string,
+): Promise<SheetMusicResult[]> {
+  const query = `${composer} ${compositionName} piano sheet music filetype:pdf`;
+  try {
+    const response = await fetch(`https://html.duckduckgo.com/html/?q=${encodeURIComponent(query)}`, {
+      headers: { "User-Agent": "Mozilla/5.0 (compatible; PianoMasteryPortal/1.0)" },
+      signal: AbortSignal.timeout(8_000),
+    });
+    if (!response.ok) return [];
+    const html = await response.text();
+    const candidates = Array.from(html.matchAll(/<a[^>]*class="result__a"[^>]*href="([^"]+)"[^>]*>([\s\S]*?)<\/a>/g))
+      .map((match) => {
+        const encodedUrl = match[1].replace(/&amp;/g, "&");
+        const resultTitle = decodeSearchResultTitle(match[2]);
+        try {
+          const wrappedUrl = new URL(encodedUrl.startsWith("//") ? `https:${encodedUrl}` : encodedUrl);
+          return { pdfUrl: wrappedUrl.searchParams.get("uddg") ?? "", resultTitle };
+        } catch {
+          return { pdfUrl: "", resultTitle };
+        }
+      })
+      .filter((candidate) => isAuthorizedOpenScorePdfUrl(candidate.pdfUrl))
+      .filter((candidate) => isStrongScoreMatch(candidate.resultTitle, compositionName, composer));
+
+    return Array.from(new Map(candidates.map((candidate) => [candidate.pdfUrl, candidate])).values()).slice(0, 3).map(({ pdfUrl, resultTitle }) => ({
+      source: "public_pdf",
+      title: resultTitle,
+      url: pdfUrl,
+      pdfUrl,
+      previewUrl: pdfUrl,
+      canImportDirectly: true,
+      confidence: "medium",
+      notes: "Direct PDF from an established open-score collection — ready to import.",
+    }));
+  } catch (error) {
+    console.warn("[SheetFinder] Public PDF search unavailable:", error instanceof Error ? error.message : error);
+    return [];
+  }
+}
+
+function decodeSearchResultTitle(value: string): string {
+  return value
+    .replace(/<[^>]+>/g, "")
+    .replace(/&amp;/g, "&")
+    .replace(/&#x27;/g, "'")
+    .replace(/&quot;/g, "\"")
+    .trim();
+}
+
+/**
+ * A direct-PDF auto-import must have a strong textual connection to the work;
+ * this prevents a broad public search from importing a merely similar title.
+ */
+export function isStrongScoreMatch(resultTitle: string, compositionName: string, composer: string): boolean {
+  const normalize = (value: string) => value.toLocaleLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+  const title = normalize(resultTitle);
+  const compositionTokens = normalize(compositionName).split(" ").filter((token) => token.length >= 3);
+  const composerTokens = normalize(composer).split(" ").filter((token) => token.length >= 3);
+  if (compositionTokens.length === 0) return false;
+
+  const matchingCompositionTokens = compositionTokens.filter((token) => title.includes(token)).length;
+  const matchingComposerTokens = composerTokens.filter((token) => title.includes(token)).length;
+  const titleMatches = matchingCompositionTokens === compositionTokens.length;
+  const composerMatches = composerTokens.length === 0 || matchingComposerTokens > 0;
+  return titleMatches && composerMatches;
 }
 
 /** Scan YouTube video description and comments for PDF/sheet music links */

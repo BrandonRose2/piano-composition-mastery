@@ -33,6 +33,7 @@ import { createHash } from "crypto";
 import { users } from "../drizzle/schema";
 import { eq } from "drizzle-orm";
 import { assignCompositionToComposerFolder } from "./composerFolderService";
+import { describeAcquisitionAvailability, selectAutoAcquireCandidate } from "@shared/sheetMusicAcquisition";
 
 export const appRouter = router({
   system: systemRouter,
@@ -572,7 +573,21 @@ export const appRouter = router({
         // Non-fatal — continue with original results
       }
 
-      return result;
+      const autoAcquireCandidate = selectAutoAcquireCandidate(result.sources ?? []);
+      return {
+        ...result,
+        acquisition: {
+          status: autoAcquireCandidate ? "available" : "manual_source_required",
+          message: describeAcquisitionAvailability(autoAcquireCandidate),
+          candidate: autoAcquireCandidate
+            ? {
+                pdfUrl: autoAcquireCandidate.pdfUrl!,
+                title: autoAcquireCandidate.title,
+                source: autoAcquireCandidate.source,
+              }
+            : null,
+        },
+      };
     }),
 
   /**
@@ -580,10 +595,11 @@ export const appRouter = router({
    * Fetches the PDF from the given URL and kicks off AI analysis.
    */
   importSheetMusicResult: protectedProcedure
-    .input(z.object({
-      pdfUrl: z.string().url(),
-      titleHint: z.string().optional().default(""),
-      isScribd: z.boolean().optional().default(false),
+      .input(z.object({
+        pdfUrl: z.string().url(),
+        titleHint: z.string().optional().default(""),
+        isScribd: z.boolean().optional().default(false),
+        sourceLabel: z.string().trim().max(128).optional(),
     }))
     .mutation(async ({ input, ctx }) => {
       const userId = await resolveLibraryOwnerId(ctx.user.id);
@@ -630,7 +646,18 @@ export const appRouter = router({
       const key = `compositions/${userId}/${Date.now()}-${fileName.replace(/[^a-zA-Z0-9._-]/g, "_")}`;
       const { url: fileUrl } = await storagePut(key, buffer, "application/pdf");
 
-      const composition = await createComposition({ userId, title, fileName, fileKey: key, fileUrl, contentHash, mimeType: "application/pdf", status: "pending" });
+      const composition = await createComposition({
+        userId,
+        title,
+        fileName,
+        fileKey: key,
+        fileUrl,
+        contentHash,
+        mimeType: "application/pdf",
+        sourceUrl: input.pdfUrl,
+        sourceLabel: input.sourceLabel ?? null,
+        status: "pending",
+      });
       if (!composition) throw new Error("Failed to create composition record");
 
       const compositionId = composition.id;

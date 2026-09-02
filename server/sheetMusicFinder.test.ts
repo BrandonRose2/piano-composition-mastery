@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { orderSourcesByPriority, type SheetMusicResult } from "./sheetMusicFinder";
+import { isStrongScoreMatch, orderSourcesByPriority, type SheetMusicResult } from "./sheetMusicFinder";
 
 const source = (kind: SheetMusicResult["source"]): SheetMusicResult => ({
   source: kind,
@@ -46,5 +46,18 @@ describe("sheet music finder source priority", () => {
       "youtube_comments",
       "musescore",
     ]);
+  });
+
+  it("does not treat an unrelated public PDF as an auto-importable score match", () => {
+    expect(isStrongScoreMatch(
+      "IMSLP: Jelly-Roll Morton — New Orleans Blues",
+      "Moody Blue",
+      "James Malikey",
+    )).toBe(false);
+    expect(isStrongScoreMatch(
+      "Moody Blue — James Malikey Piano Score",
+      "Moody Blue",
+      "James Malikey",
+    )).toBe(true);
   });
 });

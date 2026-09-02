@@ -8,7 +8,7 @@ import { useState, useCallback, useRef, useEffect } from "react";
 import { useLocation } from "wouter";
 import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
-import { Music, Upload, BookOpen, ChevronRight, Loader2, AlertCircle, CheckCircle2, Clock, Trash2, Youtube, ExternalLink, LogOut, User, Search, FileText, X, Download, Import, Link, Sparkles, ArrowRight, Check, Globe, FolderOpen, Archive, Library, Timer } from "lucide-react";
+import { Music, Upload, BookOpen, ChevronRight, Loader2, AlertCircle, CheckCircle2, Clock, Trash2, Youtube, ExternalLink, LogOut, User, Search, FileText, X, Download, Import, Link, Sparkles, ArrowRight, Check, Globe, FolderOpen, Archive, Library, Timer, Info } from "lucide-react";
 import { ComposerFolderLibrary } from "@/components/ComposerFolderLibrary";
 import Metronome from "@/components/Metronome";
 import { useAuth } from "@/_core/hooks/useAuth";
@@ -561,6 +561,11 @@ type FinderResult = {
     confidence: string;
     notes?: string;
   }>;
+  acquisition?: {
+    status: "available" | "manual_source_required";
+    message: string;
+    candidate: { pdfUrl: string; title: string; source: string } | null;
+  };
 };
 
 function sourceLabel(source: string) {
@@ -572,6 +577,7 @@ function sourceLabel(source: string) {
   if (source === "mutopia") return { label: "Mutopia Project (Free)", color: "oklch(0.74_0.14_180)", bg: "oklch(0.42_0.14_180/0.15)", border: "oklch(0.42_0.14_180/0.35)" };
   if (source === "musopen") return { label: "Musopen (Free Catalog)", color: "oklch(0.73_0.13_205)", bg: "oklch(0.42_0.13_205/0.15)", border: "oklch(0.42_0.13_205/0.35)" };
   if (source === "free_scores") return { label: "Free-scores (Free)", color: "oklch(0.72_0.14_235)", bg: "oklch(0.42_0.14_235/0.15)", border: "oklch(0.42_0.14_235/0.35)" };
+  if (source === "public_pdf") return { label: "Verified Free PDF", color: "oklch(0.72_0.14_180)", bg: "oklch(0.42_0.14_180/0.15)", border: "oklch(0.42_0.14_180/0.35)" };
   if (source === "musescore" || source === "web") return { label: "Subscription · Last Resort", color: "oklch(0.72_0.12_260)", bg: "oklch(0.42_0.12_260/0.15)", border: "oklch(0.42_0.12_260/0.35)" };
   return { label: "Source", color: "oklch(0.65_0.015_265)", bg: "oklch(0.22_0.010_265/0.15)", border: "oklch(0.30_0.010_265/0.35)" };
 }
@@ -595,10 +601,32 @@ function FindAnyPiece() {
 
   const findMutation = trpc.findSheetMusic.useMutation({
     onSuccess: (data) => {
-      setResult(data as FinderResult);
-      if ((data as FinderResult).sources.length === 0) {
+      const finderResult = data as FinderResult;
+      setResult(finderResult);
+      if (finderResult.sources.length === 0) {
         toast.info("No sheet music found. Try a different link or search manually.");
+        return;
       }
+
+      const candidate = finderResult.acquisition?.candidate;
+      if (!candidate) return;
+
+      setImportingUrl(candidate.pdfUrl);
+      toast.info("Verified PDF found — importing it into your library now.");
+      importMutation.mutate(
+        {
+          pdfUrl: candidate.pdfUrl,
+          titleHint: `${finderResult.compositionName} — ${finderResult.composer}`,
+          sourceLabel: candidate.source.replace(/_/g, " "),
+        },
+        {
+          onSuccess: (imported) => {
+            setImportedUrls((current) => new Set(Array.from(current).concat(candidate.pdfUrl)));
+            toast.success(`"${imported.title}" has been added to your library.`);
+          },
+          onSettled: () => setImportingUrl(null),
+        },
+      );
     },
     onError: (err) => {
       toast.error("Search failed: " + err.message);
@@ -631,6 +659,7 @@ function FindAnyPiece() {
         pdfUrl: urlToFetch,
         titleHint: result ? `${result.compositionName} — ${result.composer}` : src.title,
         isScribd: src.source === "scribd",
+        sourceLabel: sourceLabel(src.source).label,
       });
       setImportedUrls(prev => new Set(Array.from(prev).concat(urlToFetch)));
     } finally {
@@ -656,7 +685,7 @@ function FindAnyPiece() {
       id: "free-sources",
       title: "Free Score Sources",
       description: "Public-domain, openly licensed, or direct public-score links.",
-      sources: result.sources.filter((source) => ["imslp", "mutopia", "musopen", "free_scores", "youtube_description", "youtube_comments"].includes(source.source)),
+      sources: result.sources.filter((source) => ["imslp", "mutopia", "musopen", "free_scores", "public_pdf", "youtube_description", "youtube_comments"].includes(source.source)),
     },
     {
       id: "last-resort",
@@ -784,6 +813,26 @@ function FindAnyPiece() {
               {(result.sourceSearchOrder?.length ? result.sourceSearchOrder : ["1. Scribd catalog and your saved Scribd library", "2. Free public score databases", "3. MuseScore only as the last resort"]).join("  ·  ")}
             </p>
           </div>
+
+          {result.acquisition && (
+            <div className={`rounded-xl border px-4 py-3 ${
+              result.acquisition.status === "available"
+                ? "border-emerald-400/25 bg-emerald-400/5"
+                : "border-[oklch(0.30_0.018_265)] bg-[oklch(0.14_0.016_265)]"
+            }`}>
+              <div className="flex items-start gap-2">
+                {result.acquisition.status === "available"
+                  ? <CheckCircle2 size={15} className="mt-0.5 shrink-0 text-emerald-400" />
+                  : <Info size={15} className="mt-0.5 shrink-0 text-[oklch(0.78_0.12_85)]" />}
+                <div>
+                  <p className="text-xs font-mono font-bold uppercase tracking-wider text-[oklch(0.78_0.12_85)]">
+                    {result.acquisition.status === "available" ? "PDF acquisition in progress" : "No direct PDF available yet"}
+                  </p>
+                  <p className="mt-1 text-xs leading-relaxed text-[oklch(0.62_0.015_265)]">{result.acquisition.message}</p>
+                </div>
+              </div>
+            </div>
+          )}
 
           {result.sources.length === 0 ? (
             <div className="nocturne-card p-6 text-center">

@@ -57,6 +57,13 @@
       "when": 1787414716952,
       "tag": "0007_puzzling_centennial",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "5",
+      "when": 1788323971576,
+      "tag": "0008_confused_killer_shrike",
+      "breakpoints": true
     }
   ]
 }

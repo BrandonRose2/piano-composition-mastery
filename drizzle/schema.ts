@@ -44,6 +44,10 @@ export const compositions = mysqlTable("compositions", {
   fileKey: varchar("fileKey", { length: 512 }),
   fileUrl: varchar("fileUrl", { length: 1024 }),
   fileName: varchar("fileName", { length: 512 }),
+  /** Original public PDF URL when the portal acquired the score from a verified source. */
+  sourceUrl: varchar("sourceUrl", { length: 1024 }),
+  /** Human-readable source name retained with an automatically acquired score. */
+  sourceLabel: varchar("sourceLabel", { length: 128 }),
   /** SHA-256 fingerprint of the uploaded bytes, scoped to the shared library. */
   contentHash: varchar("contentHash", { length: 64 }),
   mimeType: varchar("mimeType", { length: 128 }),
