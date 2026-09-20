@@ -186,12 +186,8 @@ export const appRouter = router({
         // Re-fetch file from S3 and re-run analysis in the background
         setTimeout(async () => {
           try {
-            const { storageGetSignedUrl } = await import("./storage");
-            const signedUrl = await storageGetSignedUrl(fileKey);
-            const fileResp = await fetch(signedUrl, { signal: AbortSignal.timeout(30_000) });
-            if (!fileResp.ok) throw new Error(`Could not fetch file from storage: HTTP ${fileResp.status}`);
-            const arrayBuffer = await fileResp.arrayBuffer();
-            const fileBuffer = Buffer.from(arrayBuffer);
+            const { storageGetBuffer } = await import("./storage");
+            const fileBuffer = await storageGetBuffer(fileKey);
 
             const { analysis, framework } = await analyzeComposition(fileName, fileBuffer, mimeType);
             await updateCompositionStatus(compositionId, "complete", { analysis, framework });
