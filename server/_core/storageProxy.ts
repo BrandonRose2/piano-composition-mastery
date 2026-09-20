@@ -1,6 +1,16 @@
 import type { Express } from "express";
-import { ENV } from "./env";
+import {
+  createStorageReadStream,
+  readStorageMeta,
+  resolveStoragePath,
+  storageFileExists,
+} from "../storage";
 
+/**
+ * Serves files written by storagePut() directly from local disk.
+ * Replaces the old Manus Forge presigned-S3 redirect, which only worked
+ * inside a Manus-hosted deployment.
+ */
 export function registerStorageProxy(app: Express) {
   app.get("/manus-storage/*", async (req, res) => {
     const key = (req.params as Record<string, string>)[0];
@@ -9,40 +19,34 @@ export function registerStorageProxy(app: Express) {
       return;
     }
 
-    if (!ENV.forgeApiUrl || !ENV.forgeApiKey) {
-      res.status(500).send("Storage proxy not configured");
+    let filePath: string;
+    try {
+      filePath = resolveStoragePath(key);
+    } catch {
+      res.status(400).send("Invalid storage key");
       return;
     }
 
     try {
-      const forgeUrl = new URL(
-        "v1/storage/presign/get",
-        ENV.forgeApiUrl.replace(/\/+$/, "") + "/",
-      );
-      forgeUrl.searchParams.set("path", key);
+      const exists = await storageFileExists(filePath);
+      if (!exists) {
+        res.status(404).send("File not found");
+        return;
+      }
 
-      const forgeResp = await fetch(forgeUrl, {
-        headers: { Authorization: `Bearer ${ENV.forgeApiKey}` },
+      const { contentType } = await readStorageMeta(filePath);
+      res.set("Content-Type", contentType);
+      res.set("Cache-Control", "private, max-age=3600");
+
+      const stream = createStorageReadStream(filePath);
+      stream.on("error", (err) => {
+        console.error("[StorageProxy] read error:", err);
+        if (!res.headersSent) res.status(500).send("Storage read error");
       });
-
-      if (!forgeResp.ok) {
-        const body = await forgeResp.text().catch(() => "");
-        console.error(`[StorageProxy] forge error: ${forgeResp.status} ${body}`);
-        res.status(502).send("Storage backend error");
-        return;
-      }
-
-      const { url } = (await forgeResp.json()) as { url: string };
-      if (!url) {
-        res.status(502).send("Empty signed URL from backend");
-        return;
-      }
-
-      res.set("Cache-Control", "no-store");
-      res.redirect(307, url);
+      stream.pipe(res);
     } catch (err) {
       console.error("[StorageProxy] failed:", err);
-      res.status(502).send("Storage proxy error");
+      res.status(500).send("Storage proxy error");
     }
   });
 }
