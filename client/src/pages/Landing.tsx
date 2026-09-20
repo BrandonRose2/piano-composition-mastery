@@ -14,6 +14,13 @@ const FEATURES = [
 
 type AuthMode = "landing" | "login" | "register";
 
+// "Continue with Manus / Gmail" only works when this app is hosted on Manus
+// (it needs Manus's own OAuth service). Off Manus, VITE_APP_ID / VITE_OAUTH_PORTAL_URL
+// are unset, so we hide that button and lead with the local username/password login.
+const MANUS_LOGIN_CONFIGURED = Boolean(
+  import.meta.env.VITE_OAUTH_PORTAL_URL && import.meta.env.VITE_APP_ID
+);
+
 export default function Landing() {
   const { user, loading } = useAuth();
   const [, navigate] = useLocation();
@@ -117,27 +124,31 @@ export default function Landing() {
               </h2>
               <p className="text-sm text-[oklch(0.50_0.012_265)]">
                 {mode === "login"
-                  ? "Continue with your Manus / Gmail account to open your private library"
-                  : "Use your Manus / Gmail account, or create an optional local sign-in"}
+                  ? "Sign in with your username to open your private library"
+                  : "Create a local username and password to get started"}
               </p>
             </div>
 
-            <button
-              type="button"
-              onClick={() => { window.location.assign(getLoginUrl()); }}
-              className="w-full py-3 rounded-xl bg-[oklch(0.78_0.12_85/0.15)] border border-[oklch(0.78_0.12_85/0.5)]
-                text-[oklch(0.90_0.06_85)] font-['Playfair_Display'] font-semibold text-base
-                hover:bg-[oklch(0.78_0.12_85/0.25)] hover:border-[oklch(0.78_0.12_85/0.8)]
-                transition-all duration-200 active:scale-[0.98]"
-            >
-              Continue with Manus / Gmail
-            </button>
+            {MANUS_LOGIN_CONFIGURED && (
+              <>
+                <button
+                  type="button"
+                  onClick={() => { window.location.assign(getLoginUrl()); }}
+                  className="w-full py-3 rounded-xl bg-[oklch(0.78_0.12_85/0.15)] border border-[oklch(0.78_0.12_85/0.5)]
+                    text-[oklch(0.90_0.06_85)] font-['Playfair_Display'] font-semibold text-base
+                    hover:bg-[oklch(0.78_0.12_85/0.25)] hover:border-[oklch(0.78_0.12_85/0.8)]
+                    transition-all duration-200 active:scale-[0.98]"
+                >
+                  Continue with Manus / Gmail
+                </button>
 
-            <div className="mt-6 mb-5 flex items-center gap-3">
-              <div className="flex-1 h-px bg-[oklch(0.18_0.016_265)]" />
-              <span className="text-xs text-[oklch(0.38_0.012_265)] font-mono">or use a local username</span>
-              <div className="flex-1 h-px bg-[oklch(0.18_0.016_265)]" />
-            </div>
+                <div className="mt-6 mb-5 flex items-center gap-3">
+                  <div className="flex-1 h-px bg-[oklch(0.18_0.016_265)]" />
+                  <span className="text-xs text-[oklch(0.38_0.012_265)] font-mono">or use a local username</span>
+                  <div className="flex-1 h-px bg-[oklch(0.18_0.016_265)]" />
+                </div>
+              </>
+            )}
 
             <form onSubmit={handleSubmit} className="space-y-4">
               {/* Username */}
@@ -265,30 +276,38 @@ export default function Landing() {
           </p>
 
           <div className="flex flex-col sm:flex-row items-center gap-4">
+            {MANUS_LOGIN_CONFIGURED && (
+              <button
+                onClick={() => { window.location.assign(getLoginUrl()); }}
+                className="group inline-flex items-center gap-3 px-8 py-4 rounded-xl
+                  bg-[oklch(0.78_0.12_85/0.15)] border border-[oklch(0.78_0.12_85/0.5)]
+                  text-[oklch(0.88_0.08_85)] font-['Playfair_Display'] font-semibold text-lg
+                  hover:bg-[oklch(0.78_0.12_85/0.25)] hover:border-[oklch(0.78_0.12_85/0.8)]
+                  transition-all duration-200 active:scale-[0.97]"
+              >
+                <Music size={20} className="text-[oklch(0.78_0.12_85)] group-hover:scale-110 transition-transform" />
+                Continue with Manus / Gmail
+              </button>
+            )}
             <button
-              onClick={() => { window.location.assign(getLoginUrl()); }}
-              className="group inline-flex items-center gap-3 px-8 py-4 rounded-xl
-                bg-[oklch(0.78_0.12_85/0.15)] border border-[oklch(0.78_0.12_85/0.5)]
-                text-[oklch(0.88_0.08_85)] font-['Playfair_Display'] font-semibold text-lg
-                hover:bg-[oklch(0.78_0.12_85/0.25)] hover:border-[oklch(0.78_0.12_85/0.8)]
-                transition-all duration-200 active:scale-[0.97]"
+              onClick={() => { setMode(MANUS_LOGIN_CONFIGURED ? "login" : "register"); setError(""); }}
+              className={MANUS_LOGIN_CONFIGURED
+                ? "px-8 py-4 rounded-xl border border-[oklch(0.22_0.016_265)] text-[oklch(0.60_0.012_265)] font-mono text-base hover:border-[oklch(0.35_0.016_265)] hover:text-[oklch(0.75_0.012_265)] transition-all duration-200 active:scale-[0.97]"
+                : "group inline-flex items-center gap-3 px-8 py-4 rounded-xl bg-[oklch(0.78_0.12_85/0.15)] border border-[oklch(0.78_0.12_85/0.5)] text-[oklch(0.88_0.08_85)] font-['Playfair_Display'] font-semibold text-lg hover:bg-[oklch(0.78_0.12_85/0.25)] hover:border-[oklch(0.78_0.12_85/0.8)] transition-all duration-200 active:scale-[0.97]"}
             >
-              <Music size={20} className="text-[oklch(0.78_0.12_85)] group-hover:scale-110 transition-transform" />
-              Continue with Manus / Gmail
-            </button>
-            <button
-              onClick={() => { setMode("login"); setError(""); }}
-              className="px-8 py-4 rounded-xl border border-[oklch(0.22_0.016_265)]
-                text-[oklch(0.60_0.012_265)] font-mono text-base
-                hover:border-[oklch(0.35_0.016_265)] hover:text-[oklch(0.75_0.012_265)]
-                transition-all duration-200 active:scale-[0.97]"
-            >
-              Use username
+              {MANUS_LOGIN_CONFIGURED ? "Use username" : (
+                <>
+                  <Music size={20} className="text-[oklch(0.78_0.12_85)] group-hover:scale-110 transition-transform" />
+                  Create your account
+                </>
+              )}
             </button>
           </div>
 
           <p className="mt-4 text-xs text-[oklch(0.35_0.012_265)] font-mono">
-            Your Manus account stays connected to the private piano library you already built.
+            {MANUS_LOGIN_CONFIGURED
+              ? "Your Manus account stays connected to the private piano library you already built."
+              : "Create a free username and password to start your private piano library."}
           </p>
 
           {/* Feature grid */}
