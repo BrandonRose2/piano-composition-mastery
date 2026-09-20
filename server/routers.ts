@@ -21,7 +21,6 @@ import {
 } from "./db";
 import { storagePut } from "./storage";
 import { analyzeComposition } from "./analyzeComposition";
-import { callDataApi } from "./_core/dataApi";
 import { findSheetMusicFromYouTube, findSheetMusicFromSpotify, findSheetMusicFromText, isSpotifyUrl, extractVideoId } from "./sheetMusicFinder";
 import { ENV } from "./_core/env";
 import { sdk } from "./_core/sdk";
@@ -222,36 +221,93 @@ export const appRouter = router({
         parts.push("piano performance");
         const query = parts.filter(Boolean).join(" ");
 
+        const apiKey = process.env.YOUTUBE_API_KEY;
+        if (!apiKey) {
+          console.error("[YouTube] YOUTUBE_API_KEY is not configured");
+          return [];
+        }
+
+        const formatViewCount = (count: number): string => {
+          if (count >= 1_000_000_000) return `${(count / 1_000_000_000).toFixed(1)}B views`;
+          if (count >= 1_000_000) return `${(count / 1_000_000).toFixed(1)}M views`;
+          if (count >= 1_000) return `${(count / 1_000).toFixed(1)}K views`;
+          return `${count} views`;
+        };
+
+        const formatDuration = (iso: string): string => {
+          const match = /^PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?$/.exec(iso || "");
+          if (!match) return "";
+          const hours = parseInt(match[1] || "0", 10);
+          const minutes = parseInt(match[2] || "0", 10);
+          const seconds = parseInt(match[3] || "0", 10);
+          const mm = hours > 0 ? String(minutes).padStart(2, "0") : String(minutes || 0);
+          const ss = String(seconds || 0).padStart(2, "0");
+          return hours > 0 ? `${hours}:${mm}:${ss}` : `${mm}:${ss}`;
+        };
+
+        const formatPublishedTime = (iso: string): string => {
+          const published = new Date(iso).getTime();
+          if (Number.isNaN(published)) return "";
+          const diffMs = Date.now() - published;
+          const days = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+          if (days < 1) return "today";
+          if (days < 30) return `${days} day${days === 1 ? "" : "s"} ago`;
+          const months = Math.floor(days / 30);
+          if (months < 12) return `${months} month${months === 1 ? "" : "s"} ago`;
+          const years = Math.floor(days / 365);
+          return `${years} year${years === 1 ? "" : "s"} ago`;
+        };
+
         try {
-          const result = await callDataApi("Youtube/search", {
-            query: { q: query, gl: "US", hl: "en" },
-          }) as any;
+          // Step 1: search for candidate videos (search.list doesn't return stats)
+          const searchUrl = new URL("https://www.googleapis.com/youtube/v3/search");
+          searchUrl.searchParams.set("part", "snippet");
+          searchUrl.searchParams.set("q", query);
+          searchUrl.searchParams.set("type", "video");
+          searchUrl.searchParams.set("videoEmbeddable", "true");
+          searchUrl.searchParams.set("maxResults", "10");
+          searchUrl.searchParams.set("regionCode", "US");
+          searchUrl.searchParams.set("relevanceLanguage", "en");
+          searchUrl.searchParams.set("key", apiKey);
 
-          const contents: any[] = result?.contents ?? [];
+          const searchRes = await fetch(searchUrl.toString());
+          if (!searchRes.ok) {
+            const detail = await searchRes.text().catch(() => "");
+            throw new Error(`YouTube search failed: ${searchRes.status} ${detail}`);
+          }
+          const searchData = (await searchRes.json()) as any;
+          const videoIds: string[] = (searchData?.items ?? [])
+            .map((item: any) => item?.id?.videoId)
+            .filter((id: unknown): id is string => Boolean(id));
 
-          const parseViews = (text: string): number => {
-            if (!text) return 0;
-            const clean = text.replace(/[^0-9.KMB]/gi, "");
-            const num = parseFloat(clean);
-            if (isNaN(num)) return 0;
-            if (/B/i.test(text)) return num * 1_000_000_000;
-            if (/M/i.test(text)) return num * 1_000_000;
-            if (/K/i.test(text)) return num * 1_000;
-            return num;
-          };
+          if (videoIds.length === 0) return [];
 
-          const videos = contents
-            .filter((c: any) => c?.type === "video" && c?.video?.videoId)
-            .map((c: any) => ({
-              videoId: c.video.videoId as string,
-              title: (c.video.title ?? "") as string,
-              channelTitle: (c.video.channelTitle ?? "") as string,
-              viewCountText: (c.video.viewCountText ?? "") as string,
-              viewCount: parseViews(c.video.viewCountText ?? ""),
-              lengthText: (c.video.lengthText ?? "") as string,
-              publishedTimeText: (c.video.publishedTimeText ?? "") as string,
-              thumbnailUrl: (c.video.thumbnails?.[0]?.url ?? "") as string,
-            }));
+          // Step 2: fetch view counts / duration for those candidates
+          const videosUrl = new URL("https://www.googleapis.com/youtube/v3/videos");
+          videosUrl.searchParams.set("part", "snippet,statistics,contentDetails");
+          videosUrl.searchParams.set("id", videoIds.join(","));
+          videosUrl.searchParams.set("key", apiKey);
+
+          const videosRes = await fetch(videosUrl.toString());
+          if (!videosRes.ok) {
+            const detail = await videosRes.text().catch(() => "");
+            throw new Error(`YouTube videos lookup failed: ${videosRes.status} ${detail}`);
+          }
+          const videosData = (await videosRes.json()) as any;
+
+          const videos = ((videosData?.items ?? []) as any[]).map((v) => {
+            const viewCount = parseInt(v?.statistics?.viewCount ?? "0", 10) || 0;
+            return {
+              videoId: v.id as string,
+              title: (v?.snippet?.title ?? "") as string,
+              channelTitle: (v?.snippet?.channelTitle ?? "") as string,
+              viewCountText: formatViewCount(viewCount),
+              viewCount,
+              lengthText: formatDuration(v?.contentDetails?.duration ?? ""),
+              publishedTimeText: formatPublishedTime(v?.snippet?.publishedAt ?? ""),
+              thumbnailUrl: (v?.snippet?.thumbnails?.high?.url ?? v?.snippet?.thumbnails?.default?.url ?? "") as string,
+            };
+          });
 
           if (videos.length === 0) return [];
 
