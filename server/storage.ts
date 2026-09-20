@@ -1,21 +1,20 @@
-// Preconfigured storage helpers for Manus WebDev templates
-// Uploads via Forge Server presigned URL to S3 (PUT direct).
-// Downloads return /manus-storage/{key} paths served via 307 redirect.
+// Local-disk storage helpers (Railway-friendly replacement for the
+// Manus WebDev "Forge" presigned-S3 storage service, which is only
+// reachable from inside Manus-hosted deployments).
+//
+// Files are written under STORAGE_DIR (defaults to ./data/storage, and
+// should point at a mounted persistent volume in production so uploads
+// survive redeploys). Each file gets a small sidecar `<file>.meta.json`
+// recording its content type so the proxy route can serve it correctly.
 
-import { ENV } from "./_core/env";
+import fs, { createReadStream } from "node:fs";
+import fsp from "node:fs/promises";
+import path from "node:path";
+import crypto from "node:crypto";
 
-function getForgeConfig() {
-  const forgeUrl = ENV.forgeApiUrl;
-  const forgeKey = ENV.forgeApiKey;
-
-  if (!forgeUrl || !forgeKey) {
-    throw new Error(
-      "Storage config missing: set BUILT_IN_FORGE_API_URL and BUILT_IN_FORGE_API_KEY",
-    );
-  }
-
-  return { forgeUrl: forgeUrl.replace(/\/+$/, ""), forgeKey };
-}
+export const STORAGE_DIR = process.env.STORAGE_DIR
+  ? path.resolve(process.env.STORAGE_DIR)
+  : path.resolve(process.cwd(), "data", "storage");
 
 function normalizeKey(relKey: string): string {
   return relKey.replace(/^\/+/, "");
@@ -28,45 +27,28 @@ function appendHashSuffix(relKey: string): string {
   return `${relKey.slice(0, lastDot)}_${hash}${relKey.slice(lastDot)}`;
 }
 
+/** Resolves a storage key to an absolute path, refusing anything that would escape STORAGE_DIR. */
+export function resolveStoragePath(relKey: string): string {
+  const key = normalizeKey(relKey);
+  const target = path.resolve(STORAGE_DIR, key);
+  if (target !== STORAGE_DIR && !target.startsWith(STORAGE_DIR + path.sep)) {
+    throw new Error("Invalid storage key");
+  }
+  return target;
+}
+
 export async function storagePut(
   relKey: string,
   data: Buffer | Uint8Array | string,
   contentType = "application/octet-stream",
 ): Promise<{ key: string; url: string }> {
-  const { forgeUrl, forgeKey } = getForgeConfig();
   const key = appendHashSuffix(normalizeKey(relKey));
+  const filePath = resolveStoragePath(key);
 
-  // 1. Get presigned PUT URL from Forge
-  const presignUrl = new URL("v1/storage/presign/put", forgeUrl + "/");
-  presignUrl.searchParams.set("path", key);
-
-  const presignResp = await fetch(presignUrl, {
-    headers: { Authorization: `Bearer ${forgeKey}` },
-  });
-
-  if (!presignResp.ok) {
-    const msg = await presignResp.text().catch(() => presignResp.statusText);
-    throw new Error(`Storage presign failed (${presignResp.status}): ${msg}`);
-  }
-
-  const { url: s3Url } = (await presignResp.json()) as { url: string };
-  if (!s3Url) throw new Error("Forge returned empty presign URL");
-
-  // 2. PUT file directly to S3
-  const blob =
-    typeof data === "string"
-      ? new Blob([data], { type: contentType })
-      : new Blob([data as any], { type: contentType });
-
-  const uploadResp = await fetch(s3Url, {
-    method: "PUT",
-    headers: { "Content-Type": contentType },
-    body: blob,
-  });
-
-  if (!uploadResp.ok) {
-    throw new Error(`Storage upload to S3 failed (${uploadResp.status})`);
-  }
+  await fsp.mkdir(path.dirname(filePath), { recursive: true });
+  const buffer = typeof data === "string" ? Buffer.from(data, "utf-8") : Buffer.from(data);
+  await fsp.writeFile(filePath, buffer);
+  await fsp.writeFile(`${filePath}.meta.json`, JSON.stringify({ contentType }));
 
   return { key, url: `/manus-storage/${key}` };
 }
@@ -76,22 +58,43 @@ export async function storageGet(relKey: string): Promise<{ key: string; url: st
   return { key, url: `/manus-storage/${key}` };
 }
 
+/**
+ * Historically returned a short-lived presigned S3 URL from Manus's Forge
+ * service. Local storage has no such concept — the proxy route below serves
+ * the file directly — so this just returns that same in-app URL.
+ */
 export async function storageGetSignedUrl(relKey: string): Promise<string> {
-  const { forgeUrl, forgeKey } = getForgeConfig();
-  const key = normalizeKey(relKey);
-
-  const getUrl = new URL("v1/storage/presign/get", forgeUrl + "/");
-  getUrl.searchParams.set("path", key);
-
-  const resp = await fetch(getUrl, {
-    headers: { Authorization: `Bearer ${forgeKey}` },
-  });
-
-  if (!resp.ok) {
-    const msg = await resp.text().catch(() => resp.statusText);
-    throw new Error(`Storage signed URL failed (${resp.status}): ${msg}`);
-  }
-
-  const { url } = (await resp.json()) as { url: string };
-  return url;
+  return `/manus-storage/${normalizeKey(relKey)}`;
 }
+
+/** Reads a stored file's raw bytes directly off disk (no HTTP round-trip needed for local storage). */
+export async function storageGetBuffer(relKey: string): Promise<Buffer> {
+  const filePath = resolveStoragePath(relKey);
+  return fsp.readFile(filePath);
+}
+
+export async function readStorageMeta(filePath: string): Promise<{ contentType: string }> {
+  try {
+    const raw = await fsp.readFile(`${filePath}.meta.json`, "utf-8");
+    const parsed = JSON.parse(raw) as { contentType?: string };
+    return { contentType: parsed.contentType || "application/octet-stream" };
+  } catch {
+    return { contentType: "application/octet-stream" };
+  }
+}
+
+export function createStorageReadStream(filePath: string) {
+  return createReadStream(filePath);
+}
+
+export async function storageFileExists(filePath: string): Promise<boolean> {
+  try {
+    const stat = await fsp.stat(filePath);
+    return stat.isFile();
+  } catch {
+    return false;
+  }
+}
+
+// Re-export the sync fs module in case other code imports it from here in the future.
+export { fs };
