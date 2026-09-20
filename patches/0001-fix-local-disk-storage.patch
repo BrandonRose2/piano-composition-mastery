@@ -1,0 +1,429 @@
+From cc8e6c1848b933fbe11fb08885c301d38de6e251 Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Fri, 18 Sep 2026 16:01:50 -0700
+Subject: [PATCH] Fix: replace Manus Forge storage with local-disk storage for
+ hosting off Manus
+
+The app's file storage (uploaded scores, imported PDFs) and its retry-analysis
+file fetch went through Manus's private Forge presign service, which is only
+reachable from inside a Manus-hosted deployment and returns a 404/500 anywhere
+else. Rewrote server/storage.ts and server/_core/storageProxy.ts to read and
+write files on local disk (STORAGE_DIR, meant to be a mounted persistent
+volume in production) instead. Also hid the "Continue with Manus / Gmail"
+button on the login page when VITE_APP_ID/VITE_OAUTH_PORTAL_URL aren't
+configured, so the already-working local username/password login is the
+primary path when this isn't running on Manus.
+
+TypeScript check, production build, and the pre-existing test suite all pass
+(the 3 failures are unrelated tests that require a live DATABASE_URL and a
+Scribd session cookie, not present in this environment).
+
+Co-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01E7APxoe9imayP1CtepiZHT
+---
+ .gitignore                   |   3 +
+ client/src/pages/Landing.tsx |  89 ++++++++++++++----------
+ server/_core/storageProxy.ts |  54 ++++++++-------
+ server/routers.ts            |   8 +--
+ server/storage.ts            | 129 ++++++++++++++++++-----------------
+ 5 files changed, 154 insertions(+), 129 deletions(-)
+
+diff --git a/.gitignore b/.gitignore
+index c7e5630..adcf429 100644
+--- a/.gitignore
++++ b/.gitignore
+@@ -112,3 +112,6 @@ temp/
+ # Manus version file (auto-generated, not part of source)
+ client/public/__manus__/version.json
+ .project-config.json
++
++# Local file storage (uploaded scores etc.) — mounted as a Railway volume in production
++/data/storage/
+diff --git a/client/src/pages/Landing.tsx b/client/src/pages/Landing.tsx
+index 21c6d13..0e569c4 100644
+--- a/client/src/pages/Landing.tsx
++++ b/client/src/pages/Landing.tsx
+@@ -14,6 +14,13 @@ const FEATURES = [
+ 
+ type AuthMode = "landing" | "login" | "register";
+ 
++// "Continue with Manus / Gmail" only works when this app is hosted on Manus
++// (it needs Manus's own OAuth service). Off Manus, VITE_APP_ID / VITE_OAUTH_PORTAL_URL
++// are unset, so we hide that button and lead with the local username/password login.
++const MANUS_LOGIN_CONFIGURED = Boolean(
++  import.meta.env.VITE_OAUTH_PORTAL_URL && import.meta.env.VITE_APP_ID
++);
++
+ export default function Landing() {
+   const { user, loading } = useAuth();
+   const [, navigate] = useLocation();
+@@ -117,27 +124,31 @@ export default function Landing() {
+               </h2>
+               <p className="text-sm text-[oklch(0.50_0.012_265)]">
+                 {mode === "login"
+-                  ? "Continue with your Manus / Gmail account to open your private library"
+-                  : "Use your Manus / Gmail account, or create an optional local sign-in"}
++                  ? "Sign in with your username to open your private library"
++                  : "Create a local username and password to get started"}
+               </p>
+             </div>
+ 
+-            <button
+-              type="button"
+-              onClick={() => { window.location.assign(getLoginUrl()); }}
+-              className="w-full py-3 rounded-xl bg-[oklch(0.78_0.12_85/0.15)] border border-[oklch(0.78_0.12_85/0.5)]
+-                text-[oklch(0.90_0.06_85)] font-['Playfair_Display'] font-semibold text-base
+-                hover:bg-[oklch(0.78_0.12_85/0.25)] hover:border-[oklch(0.78_0.12_85/0.8)]
+-                transition-all duration-200 active:scale-[0.98]"
+-            >
+-              Continue with Manus / Gmail
+-            </button>
++            {MANUS_LOGIN_CONFIGURED && (
++              <>
++                <button
++                  type="button"
++                  onClick={() => { window.location.assign(getLoginUrl()); }}
++                  className="w-full py-3 rounded-xl bg-[oklch(0.78_0.12_85/0.15)] border border-[oklch(0.78_0.12_85/0.5)]
++                    text-[oklch(0.90_0.06_85)] font-['Playfair_Display'] font-semibold text-base
++                    hover:bg-[oklch(0.78_0.12_85/0.25)] hover:border-[oklch(0.78_0.12_85/0.8)]
++                    transition-all duration-200 active:scale-[0.98]"
++                >
++                  Continue with Manus / Gmail
++                </button>
+ 
+-            <div className="mt-6 mb-5 flex items-center gap-3">
+-              <div className="flex-1 h-px bg-[oklch(0.18_0.016_265)]" />
+-              <span className="text-xs text-[oklch(0.38_0.012_265)] font-mono">or use a local username</span>
+-              <div className="flex-1 h-px bg-[oklch(0.18_0.016_265)]" />
+-            </div>
++                <div className="mt-6 mb-5 flex items-center gap-3">
++                  <div className="flex-1 h-px bg-[oklch(0.18_0.016_265)]" />
++                  <span className="text-xs text-[oklch(0.38_0.012_265)] font-mono">or use a local username</span>
++                  <div className="flex-1 h-px bg-[oklch(0.18_0.016_265)]" />
++                </div>
++              </>
++            )}
+ 
+             <form onSubmit={handleSubmit} className="space-y-4">
+               {/* Username */}
+@@ -265,30 +276,38 @@ export default function Landing() {
+           </p>
+ 
+           <div className="flex flex-col sm:flex-row items-center gap-4">
++            {MANUS_LOGIN_CONFIGURED && (
++              <button
++                onClick={() => { window.location.assign(getLoginUrl()); }}
++                className="group inline-flex items-center gap-3 px-8 py-4 rounded-xl
++                  bg-[oklch(0.78_0.12_85/0.15)] border border-[oklch(0.78_0.12_85/0.5)]
++                  text-[oklch(0.88_0.08_85)] font-['Playfair_Display'] font-semibold text-lg
++                  hover:bg-[oklch(0.78_0.12_85/0.25)] hover:border-[oklch(0.78_0.12_85/0.8)]
++                  transition-all duration-200 active:scale-[0.97]"
++              >
++                <Music size={20} className="text-[oklch(0.78_0.12_85)] group-hover:scale-110 transition-transform" />
++                Continue with Manus / Gmail
++              </button>
++            )}
+             <button
+-              onClick={() => { window.location.assign(getLoginUrl()); }}
+-              className="group inline-flex items-center gap-3 px-8 py-4 rounded-xl
+-                bg-[oklch(0.78_0.12_85/0.15)] border border-[oklch(0.78_0.12_85/0.5)]
+-                text-[oklch(0.88_0.08_85)] font-['Playfair_Display'] font-semibold text-lg
+-                hover:bg-[oklch(0.78_0.12_85/0.25)] hover:border-[oklch(0.78_0.12_85/0.8)]
+-                transition-all duration-200 active:scale-[0.97]"
+-            >
+-              <Music size={20} className="text-[oklch(0.78_0.12_85)] group-hover:scale-110 transition-transform" />
+-              Continue with Manus / Gmail
+-            </button>
+-            <button
+-              onClick={() => { setMode("login"); setError(""); }}
+-              className="px-8 py-4 rounded-xl border border-[oklch(0.22_0.016_265)]
+-                text-[oklch(0.60_0.012_265)] font-mono text-base
+-                hover:border-[oklch(0.35_0.016_265)] hover:text-[oklch(0.75_0.012_265)]
+-                transition-all duration-200 active:scale-[0.97]"
++              onClick={() => { setMode(MANUS_LOGIN_CONFIGURED ? "login" : "register"); setError(""); }}
++              className={MANUS_LOGIN_CONFIGURED
++                ? "px-8 py-4 rounded-xl border border-[oklch(0.22_0.016_265)] text-[oklch(0.60_0.012_265)] font-mono text-base hover:border-[oklch(0.35_0.016_265)] hover:text-[oklch(0.75_0.012_265)] transition-all duration-200 active:scale-[0.97]"
++                : "group inline-flex items-center gap-3 px-8 py-4 rounded-xl bg-[oklch(0.78_0.12_85/0.15)] border border-[oklch(0.78_0.12_85/0.5)] text-[oklch(0.88_0.08_85)] font-['Playfair_Display'] font-semibold text-lg hover:bg-[oklch(0.78_0.12_85/0.25)] hover:border-[oklch(0.78_0.12_85/0.8)] transition-all duration-200 active:scale-[0.97]"}
+             >
+-              Use username
++              {MANUS_LOGIN_CONFIGURED ? "Use username" : (
++                <>
++                  <Music size={20} className="text-[oklch(0.78_0.12_85)] group-hover:scale-110 transition-transform" />
++                  Create your account
++                </>
++              )}
+             </button>
+           </div>
+ 
+           <p className="mt-4 text-xs text-[oklch(0.35_0.012_265)] font-mono">
+-            Your Manus account stays connected to the private piano library you already built.
++            {MANUS_LOGIN_CONFIGURED
++              ? "Your Manus account stays connected to the private piano library you already built."
++              : "Create a free username and password to start your private piano library."}
+           </p>
+ 
+           {/* Feature grid */}
+diff --git a/server/_core/storageProxy.ts b/server/_core/storageProxy.ts
+index d2e8978..8be30e2 100644
+--- a/server/_core/storageProxy.ts
++++ b/server/_core/storageProxy.ts
+@@ -1,6 +1,16 @@
+ import type { Express } from "express";
+-import { ENV } from "./env";
++import {
++  createStorageReadStream,
++  readStorageMeta,
++  resolveStoragePath,
++  storageFileExists,
++} from "../storage";
+ 
++/**
++ * Serves files written by storagePut() directly from local disk.
++ * Replaces the old Manus Forge presigned-S3 redirect, which only worked
++ * inside a Manus-hosted deployment.
++ */
+ export function registerStorageProxy(app: Express) {
+   app.get("/manus-storage/*", async (req, res) => {
+     const key = (req.params as Record<string, string>)[0];
+@@ -9,40 +19,34 @@ export function registerStorageProxy(app: Express) {
+       return;
+     }
+ 
+-    if (!ENV.forgeApiUrl || !ENV.forgeApiKey) {
+-      res.status(500).send("Storage proxy not configured");
++    let filePath: string;
++    try {
++      filePath = resolveStoragePath(key);
++    } catch {
++      res.status(400).send("Invalid storage key");
+       return;
+     }
+ 
+     try {
+-      const forgeUrl = new URL(
+-        "v1/storage/presign/get",
+-        ENV.forgeApiUrl.replace(/\/+$/, "") + "/",
+-      );
+-      forgeUrl.searchParams.set("path", key);
+-
+-      const forgeResp = await fetch(forgeUrl, {
+-        headers: { Authorization: `Bearer ${ENV.forgeApiKey}` },
+-      });
+-
+-      if (!forgeResp.ok) {
+-        const body = await forgeResp.text().catch(() => "");
+-        console.error(`[StorageProxy] forge error: ${forgeResp.status} ${body}`);
+-        res.status(502).send("Storage backend error");
++      const exists = await storageFileExists(filePath);
++      if (!exists) {
++        res.status(404).send("File not found");
+         return;
+       }
+ 
+-      const { url } = (await forgeResp.json()) as { url: string };
+-      if (!url) {
+-        res.status(502).send("Empty signed URL from backend");
+-        return;
+-      }
++      const { contentType } = await readStorageMeta(filePath);
++      res.set("Content-Type", contentType);
++      res.set("Cache-Control", "private, max-age=3600");
+ 
+-      res.set("Cache-Control", "no-store");
+-      res.redirect(307, url);
++      const stream = createStorageReadStream(filePath);
++      stream.on("error", (err) => {
++        console.error("[StorageProxy] read error:", err);
++        if (!res.headersSent) res.status(500).send("Storage read error");
++      });
++      stream.pipe(res);
+     } catch (err) {
+       console.error("[StorageProxy] failed:", err);
+-      res.status(502).send("Storage proxy error");
++      res.status(500).send("Storage proxy error");
+     }
+   });
+ }
+diff --git a/server/routers.ts b/server/routers.ts
+index 852980f..6fc422d 100644
+--- a/server/routers.ts
++++ b/server/routers.ts
+@@ -186,12 +186,8 @@ export const appRouter = router({
+         // Re-fetch file from S3 and re-run analysis in the background
+         setTimeout(async () => {
+           try {
+-            const { storageGetSignedUrl } = await import("./storage");
+-            const signedUrl = await storageGetSignedUrl(fileKey);
+-            const fileResp = await fetch(signedUrl, { signal: AbortSignal.timeout(30_000) });
+-            if (!fileResp.ok) throw new Error(`Could not fetch file from storage: HTTP ${fileResp.status}`);
+-            const arrayBuffer = await fileResp.arrayBuffer();
+-            const fileBuffer = Buffer.from(arrayBuffer);
++            const { storageGetBuffer } = await import("./storage");
++            const fileBuffer = await storageGetBuffer(fileKey);
+ 
+             const { analysis, framework } = await analyzeComposition(fileName, fileBuffer, mimeType);
+             await updateCompositionStatus(compositionId, "complete", { analysis, framework });
+diff --git a/server/storage.ts b/server/storage.ts
+index 1d88470..7a2e6fd 100644
+--- a/server/storage.ts
++++ b/server/storage.ts
+@@ -1,21 +1,20 @@
+-// Preconfigured storage helpers for Manus WebDev templates
+-// Uploads via Forge Server presigned URL to S3 (PUT direct).
+-// Downloads return /manus-storage/{key} paths served via 307 redirect.
+-
+-import { ENV } from "./_core/env";
+-
+-function getForgeConfig() {
+-  const forgeUrl = ENV.forgeApiUrl;
+-  const forgeKey = ENV.forgeApiKey;
+-
+-  if (!forgeUrl || !forgeKey) {
+-    throw new Error(
+-      "Storage config missing: set BUILT_IN_FORGE_API_URL and BUILT_IN_FORGE_API_KEY",
+-    );
+-  }
+-
+-  return { forgeUrl: forgeUrl.replace(/\/+$/, ""), forgeKey };
+-}
++// Local-disk storage helpers (Railway-friendly replacement for the
++// Manus WebDev "Forge" presigned-S3 storage service, which is only
++// reachable from inside Manus-hosted deployments).
++//
++// Files are written under STORAGE_DIR (defaults to ./data/storage, and
++// should point at a mounted persistent volume in production so uploads
++// survive redeploys). Each file gets a small sidecar `<file>.meta.json`
++// recording its content type so the proxy route can serve it correctly.
++
++import fs, { createReadStream } from "node:fs";
++import fsp from "node:fs/promises";
++import path from "node:path";
++import crypto from "node:crypto";
++
++export const STORAGE_DIR = process.env.STORAGE_DIR
++  ? path.resolve(process.env.STORAGE_DIR)
++  : path.resolve(process.cwd(), "data", "storage");
+ 
+ function normalizeKey(relKey: string): string {
+   return relKey.replace(/^\/+/, "");
+@@ -28,45 +27,28 @@ function appendHashSuffix(relKey: string): string {
+   return `${relKey.slice(0, lastDot)}_${hash}${relKey.slice(lastDot)}`;
+ }
+ 
++/** Resolves a storage key to an absolute path, refusing anything that would escape STORAGE_DIR. */
++export function resolveStoragePath(relKey: string): string {
++  const key = normalizeKey(relKey);
++  const target = path.resolve(STORAGE_DIR, key);
++  if (target !== STORAGE_DIR && !target.startsWith(STORAGE_DIR + path.sep)) {
++    throw new Error("Invalid storage key");
++  }
++  return target;
++}
++
+ export async function storagePut(
+   relKey: string,
+   data: Buffer | Uint8Array | string,
+   contentType = "application/octet-stream",
+ ): Promise<{ key: string; url: string }> {
+-  const { forgeUrl, forgeKey } = getForgeConfig();
+   const key = appendHashSuffix(normalizeKey(relKey));
++  const filePath = resolveStoragePath(key);
+ 
+-  // 1. Get presigned PUT URL from Forge
+-  const presignUrl = new URL("v1/storage/presign/put", forgeUrl + "/");
+-  presignUrl.searchParams.set("path", key);
+-
+-  const presignResp = await fetch(presignUrl, {
+-    headers: { Authorization: `Bearer ${forgeKey}` },
+-  });
+-
+-  if (!presignResp.ok) {
+-    const msg = await presignResp.text().catch(() => presignResp.statusText);
+-    throw new Error(`Storage presign failed (${presignResp.status}): ${msg}`);
+-  }
+-
+-  const { url: s3Url } = (await presignResp.json()) as { url: string };
+-  if (!s3Url) throw new Error("Forge returned empty presign URL");
+-
+-  // 2. PUT file directly to S3
+-  const blob =
+-    typeof data === "string"
+-      ? new Blob([data], { type: contentType })
+-      : new Blob([data as any], { type: contentType });
+-
+-  const uploadResp = await fetch(s3Url, {
+-    method: "PUT",
+-    headers: { "Content-Type": contentType },
+-    body: blob,
+-  });
+-
+-  if (!uploadResp.ok) {
+-    throw new Error(`Storage upload to S3 failed (${uploadResp.status})`);
+-  }
++  await fsp.mkdir(path.dirname(filePath), { recursive: true });
++  const buffer = typeof data === "string" ? Buffer.from(data, "utf-8") : Buffer.from(data);
++  await fsp.writeFile(filePath, buffer);
++  await fsp.writeFile(`${filePath}.meta.json`, JSON.stringify({ contentType }));
+ 
+   return { key, url: `/manus-storage/${key}` };
+ }
+@@ -76,22 +58,43 @@ export async function storageGet(relKey: string): Promise<{ key: string; url: st
+   return { key, url: `/manus-storage/${key}` };
+ }
+ 
++/**
++ * Historically returned a short-lived presigned S3 URL from Manus's Forge
++ * service. Local storage has no such concept — the proxy route below serves
++ * the file directly — so this just returns that same in-app URL.
++ */
+ export async function storageGetSignedUrl(relKey: string): Promise<string> {
+-  const { forgeUrl, forgeKey } = getForgeConfig();
+-  const key = normalizeKey(relKey);
+-
+-  const getUrl = new URL("v1/storage/presign/get", forgeUrl + "/");
+-  getUrl.searchParams.set("path", key);
++  return `/manus-storage/${normalizeKey(relKey)}`;
++}
+ 
+-  const resp = await fetch(getUrl, {
+-    headers: { Authorization: `Bearer ${forgeKey}` },
+-  });
++/** Reads a stored file's raw bytes directly off disk (no HTTP round-trip needed for local storage). */
++export async function storageGetBuffer(relKey: string): Promise<Buffer> {
++  const filePath = resolveStoragePath(relKey);
++  return fsp.readFile(filePath);
++}
+ 
+-  if (!resp.ok) {
+-    const msg = await resp.text().catch(() => resp.statusText);
+-    throw new Error(`Storage signed URL failed (${resp.status}): ${msg}`);
++export async function readStorageMeta(filePath: string): Promise<{ contentType: string }> {
++  try {
++    const raw = await fsp.readFile(`${filePath}.meta.json`, "utf-8");
++    const parsed = JSON.parse(raw) as { contentType?: string };
++    return { contentType: parsed.contentType || "application/octet-stream" };
++  } catch {
++    return { contentType: "application/octet-stream" };
+   }
++}
++
++export function createStorageReadStream(filePath: string) {
++  return createReadStream(filePath);
++}
+ 
+-  const { url } = (await resp.json()) as { url: string };
+-  return url;
++export async function storageFileExists(filePath: string): Promise<boolean> {
++  try {
++    const stat = await fsp.stat(filePath);
++    return stat.isFile();
++  } catch {
++    return false;
++  }
+ }
++
++// Re-export the sync fs module in case other code imports it from here in the future.
++export { fs };
+-- 
+2.43.0
+
