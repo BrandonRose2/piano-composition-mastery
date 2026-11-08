@@ -1122,7 +1122,8 @@ export default function CompositionDetail() {
             </button>
           </div>
 
-          {/* Mobile: stacked vertical layout */}
+          {/* Render only one layout so only one YouTube player exists (CSS-hidden iframes still autoplay) */}
+          {isMobile ? (
           <div className="flex md:hidden flex-col flex-1 min-h-0 overflow-hidden">
             <div className="flex-1 min-h-0 overflow-auto bg-[oklch(0.11_0.016_265)] flex items-center justify-center p-3">
               {isBuiltIn ? (
@@ -1156,8 +1157,8 @@ export default function CompositionDetail() {
               )}
             </div>
           </div>
-
-          {/* Desktop: resizable side-by-side panels */}
+          ) : (
+          /* Desktop: resizable side-by-side panels */
           <ResizablePanelGroup direction="horizontal" className="hidden md:flex flex-1 min-h-0">
             {/* Left: Score */}
             <ResizablePanel defaultSize={50} minSize={30}>
@@ -1221,6 +1222,7 @@ export default function CompositionDetail() {
               </div>
             </ResizablePanel>
           </ResizablePanelGroup>
+          )}
         </div>
       )}
 
