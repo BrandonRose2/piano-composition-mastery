@@ -265,7 +265,7 @@ export const appRouter = router({
           searchUrl.searchParams.set("q", query);
           searchUrl.searchParams.set("type", "video");
           searchUrl.searchParams.set("videoEmbeddable", "true");
-          searchUrl.searchParams.set("maxResults", "10");
+          searchUrl.searchParams.set("maxResults", "25");
           searchUrl.searchParams.set("regionCode", "US");
           searchUrl.searchParams.set("relevanceLanguage", "en");
           searchUrl.searchParams.set("key", apiKey);
@@ -311,9 +311,24 @@ export const appRouter = router({
 
           if (videos.length === 0) return [];
 
-          // Sort by views and return top 5
-          const sorted = [...videos].sort((a, b) => b.viewCount - a.viewCount);
-          return sorted.slice(0, 5);
+          // Rank by how well the video matches the piece, then by popularity.
+          const stop = new Set(["the", "and", "for", "in", "of", "no", "op", "major", "minor", "piano", "sheet", "music"]);
+          const tok = (t: string) =>
+            t.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").split(/[^a-z0-9]+/).filter((w) => w.length > 1 && !stop.has(w));
+          const titleToks = tok(input.title);
+          const composerToks = tok(input.composer).slice(-1); // last name
+          const bad = /tutorial|lesson|how to|learn|reaction|karaoke|backing track|slowed|reverb|8d|nightcore|cover by|vocal|lyrics/i;
+          const scored = videos.map((v) => {
+            const hay = new Set(tok(`${v.title} ${v.channelTitle}`));
+            const tHit = titleToks.length ? titleToks.filter((w) => hay.has(w)).length / titleToks.length : 1;
+            const cHit = composerToks.length ? (composerToks.every((w) => hay.has(w)) ? 1 : 0) : 1;
+            const pen = bad.test(v.title) ? 1 : 0;
+            const score = tHit * 3 + cHit * 1.5 - pen * 1.5 + Math.log10(v.viewCount + 1) / 4;
+            return { v, score, tHit };
+          });
+          scored.sort((a, b) => b.score - a.score);
+          const good = scored.filter((x) => x.tHit >= 0.5);
+          return (good.length ? good : scored).slice(0, 5).map((x) => x.v);
         } catch (err) {
           console.error("[YouTube] Search failed:", err);
           return [];
