@@ -256,7 +256,13 @@ function PerformanceVideoSection({
 
   // Manual URL override state
   const [overrideInput, setOverrideInput] = useState("");
-  const [overrideId, setOverrideId] = useState<string | null>(null);
+  const overrideKey = `pm-video-override:${composer}|${title}`;
+  const [overrideId, setOverrideId] = useState<string | null>(() => {
+    try { return localStorage.getItem(overrideKey); } catch { return null; }
+  });
+  const saveOverride = (id: string | null) => {
+    try { id ? localStorage.setItem(overrideKey, id) : localStorage.removeItem(overrideKey); } catch {}
+  };
   const [overrideError, setOverrideError] = useState("");
   const [showOverride, setShowOverride] = useState(false);
 
@@ -272,6 +278,7 @@ function PerformanceVideoSection({
     setPlaying(false);
     // Clear override when picking from search results
     setOverrideId(null);
+    saveOverride(null);
     setOverrideInput("");
     setOverrideError("");
   };
@@ -283,6 +290,7 @@ function PerformanceVideoSection({
       return;
     }
     setOverrideId(id);
+    saveOverride(id);
     setOverrideError("");
     setPlaying(false);
     setShowOverride(false);
@@ -290,6 +298,7 @@ function PerformanceVideoSection({
 
   const handleOverrideClear = () => {
     setOverrideId(null);
+    saveOverride(null);
     setOverrideInput("");
     setOverrideError("");
   };

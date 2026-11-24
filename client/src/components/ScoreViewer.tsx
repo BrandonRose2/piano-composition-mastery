@@ -125,6 +125,37 @@ function PdfViewer({ fileUrl, title }: { fileUrl: string; title?: string }) {
     return () => document.removeEventListener("fullscreenchange", handler);
   }, []);
 
+  // Left/right arrow keys turn pages while this viewer is on screen.
+  const visibleRef = useRef(false);
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el || typeof IntersectionObserver === "undefined") { visibleRef.current = true; return; }
+    const io = new IntersectionObserver(([e]) => { visibleRef.current = e.isIntersecting; });
+    io.observe(el);
+    return () => io.disconnect();
+  }, [loading, error]);
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== "ArrowLeft" && e.key !== "ArrowRight") return;
+      if (e.altKey || e.ctrlKey || e.metaKey || e.shiftKey || !visibleRef.current) return;
+      const t = e.target as HTMLElement | null;
+      if (t && (t.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName))) return;
+      e.preventDefault();
+      setCurrentPage(p => e.key === "ArrowRight" ? Math.min(p + 1, pages) : Math.max(p - 1, 1));
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [pages]);
+
+  // After a page turn, bring the top of the score back into view.
+  const firstRender = useRef(true);
+  useEffect(() => {
+    if (firstRender.current) { firstRender.current = false; return; }
+    const el = containerRef.current;
+    if (el && el.getBoundingClientRect().top < 0) el.scrollIntoView({ block: "start" });
+  }, [currentPage]);
+
   if (loading) {
     return (
       <div className="flex flex-col items-center justify-center py-24 gap-4">
@@ -378,7 +409,7 @@ export default function ScoreViewer({ fileUrl, mimeType, title }: ScoreViewerPro
     /\.(png|jpe?g|webp|gif|bmp|svg)$/i.test(fileUrl);
 
   return (
-    <div className="rounded-lg overflow-hidden border border-[oklch(0.22_0.016_265)] bg-[oklch(0.12_0.018_265)]">
+    <div className="rounded-lg overflow-clip border border-[oklch(0.22_0.016_265)] bg-[oklch(0.12_0.018_265)]">
       {isPdf
         ? <PdfViewer fileUrl={fileUrl} title={title} />
         : isImage
