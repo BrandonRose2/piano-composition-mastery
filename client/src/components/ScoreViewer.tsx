@@ -1,0 +1,425 @@
+import { useEffect, useRef, useState, useCallback } from "react";
+import {
+  ZoomIn, ZoomOut, ChevronLeft, ChevronRight, Maximize2, Minimize2,
+  Loader2, AlertCircle, Download, RotateCw, Printer
+} from "lucide-react";
+import {
+  adjustScoreZoom,
+  MAX_IMAGE_SCORE_ZOOM,
+  MAX_PDF_SCORE_ZOOM,
+  MIN_SCORE_ZOOM,
+  SCORE_ZOOM_STEP,
+  scoreZoomWidthPercent,
+} from "@shared/scoreZoom";
+
+// ── Types ────────────────────────────────────────────────────────────────────
+interface ScoreViewerProps {
+  fileUrl: string;
+  mimeType: string;
+  title?: string;
+}
+
+// ── PDF Viewer ────────────────────────────────────────────────────────────────
+function PdfViewer({ fileUrl, title }: { fileUrl: string; title?: string }) {
+  const [pages, setPages] = useState<number>(0);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [scale, setScale] = useState(1);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [fullscreen, setFullscreen] = useState(false);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const pdfDocRef = useRef<any>(null);
+  const renderTaskRef = useRef<{ cancel: () => void } | null>(null);
+
+  // Load PDF document once
+  useEffect(() => {
+    let cancelled = false;
+    setLoading(true);
+    setError(null);
+
+    (async () => {
+      try {
+        // Dynamic import to avoid SSR issues
+        const pdfjsLib = await import("pdfjs-dist");
+        // Set worker source — use the CDN for the matching version
+        pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdn.jsdelivr.net/npm/pdfjs-dist@${pdfjsLib.version}/build/pdf.worker.min.mjs`;
+
+        // pdf.js v6 decodes scanned-image PDFs (CCITT fax, JBIG2, JPEG 2000) with
+        // WebAssembly decoders that it loads from wasmUrl. Without it those pages render blank.
+        const loadingTask = pdfjsLib.getDocument({
+          url: fileUrl,
+          wasmUrl: `https://cdn.jsdelivr.net/npm/pdfjs-dist@${pdfjsLib.version}/wasm/`,
+        });
+        const pdf = await loadingTask.promise;
+        if (cancelled) return;
+        pdfDocRef.current = pdf;
+        setPages(pdf.numPages);
+        setLoading(false);
+      } catch (err) {
+        if (!cancelled) {
+          console.error("[ScoreViewer] PDF load error:", err);
+          setError("Could not load the PDF score. Please try downloading it directly.");
+          setLoading(false);
+        }
+      }
+    })();
+
+    return () => { cancelled = true; };
+  }, [fileUrl]);
+
+  // Render current page whenever page or scale changes
+  useEffect(() => {
+    if (!pdfDocRef.current || !canvasRef.current) return;
+
+    // Cancel any in-progress render
+    if (renderTaskRef.current) {
+      renderTaskRef.current.cancel();
+      renderTaskRef.current = null;
+    }
+
+    const canvas = canvasRef.current;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+
+    let cancelled = false;
+
+    (async () => {
+      try {
+        const page = await pdfDocRef.current.getPage(currentPage);
+        if (cancelled) return;
+
+        const viewport = page.getViewport({ scale });
+        canvas.width = viewport.width;
+        canvas.height = viewport.height;
+
+        const renderTask = page.render({ canvasContext: ctx, viewport });
+        renderTaskRef.current = renderTask;
+        await renderTask.promise;
+        renderTaskRef.current = null;
+      } catch (err: unknown) {
+        // Ignore cancellation errors
+        if (err && typeof err === "object" && "name" in err && (err as { name: string }).name === "RenderingCancelledException") return;
+        if (!cancelled) console.error("[ScoreViewer] Render error:", err);
+      }
+    })();
+
+    return () => { cancelled = true; };
+  }, [currentPage, scale, pages]);
+
+  const zoomIn = () => setScale((current) => adjustScoreZoom(current, SCORE_ZOOM_STEP, MAX_PDF_SCORE_ZOOM));
+  const zoomOut = () => setScale((current) => adjustScoreZoom(current, -SCORE_ZOOM_STEP, MAX_PDF_SCORE_ZOOM));
+  const prevPage = () => setCurrentPage(p => Math.max(p - 1, 1));
+  const nextPage = () => setCurrentPage(p => Math.min(p + 1, pages));
+
+  const toggleFullscreen = useCallback(() => {
+    if (!fullscreen) {
+      containerRef.current?.requestFullscreen?.().catch(() => {});
+    } else {
+      document.exitFullscreen?.().catch(() => {});
+    }
+    setFullscreen(f => !f);
+  }, [fullscreen]);
+
+  useEffect(() => {
+    const handler = () => {
+      if (!document.fullscreenElement) setFullscreen(false);
+    };
+    document.addEventListener("fullscreenchange", handler);
+    return () => document.removeEventListener("fullscreenchange", handler);
+  }, []);
+
+  // Left/right arrow keys turn pages while this viewer is on screen.
+  const visibleRef = useRef(false);
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el || typeof IntersectionObserver === "undefined") { visibleRef.current = true; return; }
+    const io = new IntersectionObserver(([e]) => { visibleRef.current = e.isIntersecting; });
+    io.observe(el);
+    return () => io.disconnect();
+  }, [loading, error]);
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== "ArrowLeft" && e.key !== "ArrowRight") return;
+      if (e.altKey || e.ctrlKey || e.metaKey || e.shiftKey || !visibleRef.current) return;
+      const t = e.target as HTMLElement | null;
+      if (t && (t.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName))) return;
+      e.preventDefault();
+      setCurrentPage(p => e.key === "ArrowRight" ? Math.min(p + 1, pages) : Math.max(p - 1, 1));
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [pages]);
+
+  // After a page turn, bring the top of the score back into view.
+  const firstRender = useRef(true);
+  useEffect(() => {
+    if (firstRender.current) { firstRender.current = false; return; }
+    const el = containerRef.current;
+    if (el && el.getBoundingClientRect().top < 0) el.scrollIntoView({ block: "start" });
+  }, [currentPage]);
+
+  if (loading) {
+    return (
+      <div className="flex flex-col items-center justify-center py-24 gap-4">
+        <Loader2 size={32} className="animate-spin text-[oklch(0.78_0.12_85)]" />
+        <p className="font-mono text-xs text-[oklch(0.50_0.012_265)] uppercase tracking-widest">Loading score…</p>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="flex flex-col items-center justify-center py-20 gap-4">
+        <AlertCircle size={28} className="text-red-400" />
+        <p className="text-sm text-[oklch(0.65_0.015_265)] text-center max-w-sm">{error}</p>
+        <a href={fileUrl} download target="_blank" rel="noopener noreferrer"
+          className="inline-flex items-center gap-2 text-xs font-mono text-[oklch(0.78_0.12_85)] border border-[oklch(0.78_0.12_85/0.3)] px-3 py-1.5 rounded hover:bg-[oklch(0.78_0.12_85/0.08)] transition-colors">
+          <Download size={12} /> Download PDF
+        </a>
+      </div>
+    );
+  }
+
+  return (
+    <div
+      ref={containerRef}
+      className={`flex flex-col ${fullscreen ? "bg-[oklch(0.10_0.016_265)] h-screen" : ""}`}
+    >
+      {/* Toolbar */}
+      <div className="flex flex-wrap items-center gap-y-1 px-2 py-2 sm:flex-nowrap sm:justify-between sm:px-4 border-b border-[oklch(0.22_0.016_265)] bg-[oklch(0.13_0.018_265)] sticky top-0 z-10">
+        {/* Page navigation */}
+        <div className="flex items-center gap-2">
+          <button onClick={prevPage} disabled={currentPage <= 1}
+            className="p-1.5 rounded hover:bg-[oklch(0.22_0.016_265)] disabled:opacity-30 transition-colors text-[oklch(0.65_0.015_265)]">
+            <ChevronLeft size={16} />
+          </button>
+          <span className="font-mono text-xs text-[oklch(0.55_0.012_265)] min-w-[3.75rem] whitespace-nowrap text-center">
+            {currentPage} / {pages}
+          </span>
+          <button onClick={nextPage} disabled={currentPage >= pages}
+            className="p-1.5 rounded hover:bg-[oklch(0.22_0.016_265)] disabled:opacity-30 transition-colors text-[oklch(0.65_0.015_265)]">
+            <ChevronRight size={16} />
+          </button>
+        </div>
+
+        {/* Title */}
+        <span className="font-['Playfair_Display'] text-sm text-[oklch(0.78_0.12_85)] hidden sm:block truncate max-w-xs">
+          {title ?? "Score"}
+        </span>
+
+        {/* Zoom + fullscreen */}
+        <div className="ml-auto flex items-center gap-1 sm:ml-0">
+          <button onClick={zoomOut} disabled={scale <= MIN_SCORE_ZOOM}
+            className="p-1.5 rounded hover:bg-[oklch(0.22_0.016_265)] disabled:opacity-30 transition-colors text-[oklch(0.65_0.015_265)]">
+            <ZoomOut size={15} />
+          </button>
+          <span className="font-mono text-[0.65rem] text-[oklch(0.50_0.012_265)] w-10 shrink-0 whitespace-nowrap text-center">
+            {Math.round(scale * 100)}%
+          </span>
+          <button onClick={zoomIn} disabled={scale >= MAX_PDF_SCORE_ZOOM}
+            className="p-1.5 rounded hover:bg-[oklch(0.22_0.016_265)] disabled:opacity-30 transition-colors text-[oklch(0.65_0.015_265)]">
+            <ZoomIn size={15} />
+          </button>
+          <div className="w-px h-4 bg-[oklch(0.25_0.016_265)] mx-1" />
+          <button
+            onClick={() => {
+              const win = window.open(fileUrl, '_blank');
+              if (win) { win.onload = () => { win.focus(); win.print(); }; }
+            }}
+            className="p-1.5 rounded hover:bg-[oklch(0.22_0.016_265)] transition-colors text-[oklch(0.65_0.015_265)]"
+            title="Print score">
+            <Printer size={15} />
+          </button>
+          <a href={fileUrl} download target="_blank" rel="noopener noreferrer"
+            className="p-1.5 rounded hover:bg-[oklch(0.22_0.016_265)] transition-colors text-[oklch(0.65_0.015_265)]"
+            title="Download PDF">
+            <Download size={15} />
+          </a>
+          <button onClick={toggleFullscreen}
+            className="p-1.5 rounded hover:bg-[oklch(0.22_0.016_265)] transition-colors text-[oklch(0.65_0.015_265)]"
+            title={fullscreen ? "Exit fullscreen" : "Fullscreen"}>
+            {fullscreen ? <Minimize2 size={15} /> : <Maximize2 size={15} />}
+          </button>
+        </div>
+      </div>
+
+      {/* Canvas */}
+      <div className="overflow-auto flex-1 bg-[oklch(0.11_0.016_265)]">
+        <div className="flex justify-center py-6 px-4">
+          <canvas
+            ref={canvasRef}
+            className="shadow-2xl shadow-black/60 rounded"
+            style={{ width: scoreZoomWidthPercent(scale), maxWidth: "none", height: "auto" }}
+          />
+        </div>
+      </div>
+
+      {/* Page dots for small page counts */}
+      {pages <= 20 && (
+        <div className="flex justify-center gap-1 py-2 bg-[oklch(0.13_0.018_265)] border-t border-[oklch(0.22_0.016_265)]">
+          {Array.from({ length: pages }, (_, i) => (
+            <button key={i} onClick={() => setCurrentPage(i + 1)}
+              className={`w-1.5 h-1.5 rounded-full transition-all ${i + 1 === currentPage ? "bg-[oklch(0.78_0.12_85)] w-3" : "bg-[oklch(0.30_0.016_265)] hover:bg-[oklch(0.50_0.016_265)]"}`} />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── Image Viewer ──────────────────────────────────────────────────────────────
+function ImageViewer({ fileUrl, title }: { fileUrl: string; title?: string }) {
+  const [scale, setScale] = useState(1.0);
+  const [rotation, setRotation] = useState(0);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
+  const [fullscreen, setFullscreen] = useState(false);
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  const toggleFullscreen = useCallback(() => {
+    if (!fullscreen) {
+      containerRef.current?.requestFullscreen?.().catch(() => {});
+    } else {
+      document.exitFullscreen?.().catch(() => {});
+    }
+    setFullscreen(f => !f);
+  }, [fullscreen]);
+
+  useEffect(() => {
+    const handler = () => {
+      if (!document.fullscreenElement) setFullscreen(false);
+    };
+    document.addEventListener("fullscreenchange", handler);
+    return () => document.removeEventListener("fullscreenchange", handler);
+  }, []);
+
+  return (
+    <div ref={containerRef} className={`flex flex-col ${fullscreen ? "bg-[oklch(0.10_0.016_265)] h-screen" : ""}`}>
+      {/* Toolbar */}
+      <div className="flex flex-wrap items-center gap-y-1 px-2 py-2 sm:flex-nowrap sm:justify-between sm:px-4 border-b border-[oklch(0.22_0.016_265)] bg-[oklch(0.13_0.018_265)] sticky top-0 z-10">
+        <span className="font-['Playfair_Display'] text-sm text-[oklch(0.78_0.12_85)] truncate max-w-xs">
+          {title ?? "Score"}
+        </span>
+        <div className="ml-auto flex items-center gap-1 sm:ml-0">
+          <button onClick={() => setScale((current) => adjustScoreZoom(current, -SCORE_ZOOM_STEP, MAX_IMAGE_SCORE_ZOOM))} disabled={scale <= MIN_SCORE_ZOOM}
+            className="p-1.5 rounded hover:bg-[oklch(0.22_0.016_265)] transition-colors text-[oklch(0.65_0.015_265)]">
+            <ZoomOut size={15} />
+          </button>
+          <span className="font-mono text-[0.65rem] text-[oklch(0.50_0.012_265)] w-10 shrink-0 whitespace-nowrap text-center">
+            {Math.round(scale * 100)}%
+          </span>
+          <button onClick={() => setScale((current) => adjustScoreZoom(current, SCORE_ZOOM_STEP, MAX_IMAGE_SCORE_ZOOM))} disabled={scale >= MAX_IMAGE_SCORE_ZOOM}
+            className="p-1.5 rounded hover:bg-[oklch(0.22_0.016_265)] transition-colors text-[oklch(0.65_0.015_265)]">
+            <ZoomIn size={15} />
+          </button>
+          <button onClick={() => setRotation(r => (r + 90) % 360)}
+            className="p-1.5 rounded hover:bg-[oklch(0.22_0.016_265)] transition-colors text-[oklch(0.65_0.015_265)]"
+            title="Rotate">
+            <RotateCw size={15} />
+          </button>
+          <div className="w-px h-4 bg-[oklch(0.25_0.016_265)] mx-1" />
+          <button
+            onClick={() => {
+              const win = window.open(fileUrl, '_blank');
+              if (win) { win.onload = () => { win.focus(); win.print(); }; }
+            }}
+            className="p-1.5 rounded hover:bg-[oklch(0.22_0.016_265)] transition-colors text-[oklch(0.65_0.015_265)]"
+            title="Print score">
+            <Printer size={15} />
+          </button>
+          <a href={fileUrl} download target="_blank" rel="noopener noreferrer"
+            className="p-1.5 rounded hover:bg-[oklch(0.22_0.016_265)] transition-colors text-[oklch(0.65_0.015_265)]"
+            title="Download">
+            <Download size={15} />
+          </a>
+          <button onClick={toggleFullscreen}
+            className="p-1.5 rounded hover:bg-[oklch(0.22_0.016_265)] transition-colors text-[oklch(0.65_0.015_265)]">
+            {fullscreen ? <Minimize2 size={15} /> : <Maximize2 size={15} />}
+          </button>
+        </div>
+      </div>
+
+      {/* Image */}
+      <div className="overflow-auto flex-1 bg-[oklch(0.11_0.016_265)]">
+        <div className="flex justify-center items-start py-6 px-4 min-h-full">
+          {loading && !error && (
+            <div className="flex flex-col items-center gap-3 py-16">
+              <Loader2 size={28} className="animate-spin text-[oklch(0.78_0.12_85)]" />
+              <p className="font-mono text-xs text-[oklch(0.50_0.012_265)]">Loading score…</p>
+            </div>
+          )}
+          {error && (
+            <div className="flex flex-col items-center gap-3 py-16">
+              <AlertCircle size={28} className="text-red-400" />
+              <p className="text-sm text-[oklch(0.65_0.015_265)]">Could not load the image score.</p>
+              <a href={fileUrl} download target="_blank" rel="noopener noreferrer"
+                className="inline-flex items-center gap-2 text-xs font-mono text-[oklch(0.78_0.12_85)] border border-[oklch(0.78_0.12_85/0.3)] px-3 py-1.5 rounded hover:bg-[oklch(0.78_0.12_85/0.08)] transition-colors">
+                <Download size={12} /> Download
+              </a>
+            </div>
+          )}
+          <img
+            src={fileUrl}
+            alt={title ?? "Piano score"}
+            onLoad={() => setLoading(false)}
+            onError={() => { setLoading(false); setError(true); }}
+            className="shadow-2xl shadow-black/60 rounded transition-transform duration-200"
+            style={{
+              display: error ? "none" : "block",
+              transform: `rotate(${rotation}deg)`,
+              transformOrigin: "top center",
+              width: scoreZoomWidthPercent(scale),
+              maxWidth: "none",
+            }}
+          />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Unsupported File Fallback ─────────────────────────────────────────────────
+function UnsupportedViewer({ fileUrl, title }: { fileUrl: string; title?: string }) {
+  return (
+    <div className="flex flex-col items-center justify-center gap-4 p-10 text-center">
+      <div className="text-4xl">📄</div>
+      <div>
+        <p className="text-[oklch(0.85_0.015_265)] font-medium mb-1">
+          {title ?? "This file"} cannot be previewed
+        </p>
+        <p className="text-sm text-[oklch(0.55_0.015_265)]">
+          This file type is not supported for in-browser viewing.
+        </p>
+      </div>
+      <a
+        href={fileUrl}
+        download
+        target="_blank"
+        rel="noopener noreferrer"
+        className="inline-flex items-center gap-2 px-4 py-2 rounded-md bg-[oklch(0.3_0.02_265)] hover:bg-[oklch(0.35_0.025_265)] text-[oklch(0.9_0.01_265)] text-sm transition-colors"
+      >
+        ⬇ Download File
+      </a>
+    </div>
+  );
+}
+
+// ── Main Export ───────────────────────────────────────────────────────────────
+export default function ScoreViewer({ fileUrl, mimeType, title }: ScoreViewerProps) {
+  const isPdf = mimeType === "application/pdf" || fileUrl.toLowerCase().endsWith(".pdf");
+  const isImage = mimeType?.startsWith("image/") ||
+    /\.(png|jpe?g|webp|gif|bmp|svg)$/i.test(fileUrl);
+
+  return (
+    <div className="rounded-lg overflow-clip border border-[oklch(0.22_0.016_265)] bg-[oklch(0.12_0.018_265)]">
+      {isPdf
+        ? <PdfViewer fileUrl={fileUrl} title={title} />
+        : isImage
+          ? <ImageViewer fileUrl={fileUrl} title={title} />
+          : <UnsupportedViewer fileUrl={fileUrl} title={title} />}
+    </div>
+  );
+}
